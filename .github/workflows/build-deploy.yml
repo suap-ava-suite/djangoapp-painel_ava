@@ -89,7 +89,7 @@ jobs:
     strategy:
       fail-fast: false # Se falhar em um servidor, continua no outro
       matrix:
-        host: [ "${{ vars.PROD_HOST_1 }}", "${{ vars.PROD_HOST_2 }}" ]
+        host: [ "${{ vars.PROD_HOST_1 }}", "${{ vars.PROD_HOST_2 }}", "${{ vars.PROD_HOST_3 }}" ]
 
     steps:
       - name: Checkout code

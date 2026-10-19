@@ -242,10 +242,10 @@ def get_diarios(
                 diario["checkgradesurl"] = reverse(
                     "painel:checkgrades", kwargs={"id_ambiente": ava["ambiente"]["id"], "id_diario": id_diario}
                 )
-                diario["mensagemurl"] = f"{settings.OAUTH['BASE_URL']}/edu/enviar_mensagem/?diario={id_diario}"
+                diario["mensagemurl"] = f"{settings.SUAP_AUTH['BASE_URL']}/edu/enviar_mensagem/?diario={id_diario}"
 
             if id_diario:
-                diario["suapsurl"] = f"{settings.OAUTH['BASE_URL']}/edu/meu_diario/{id_diario}/1/"
+                diario["suapsurl"] = f"{settings.SUAP_AUTH['BASE_URL']}/edu/meu_diario/{id_diario}/1/"
                 if diario.get("can_set_visibility"):
                     diario["gradesurl"] = re.sub("/course/view", "/grade/report/grader/index", diario["viewurl"])
                 else:

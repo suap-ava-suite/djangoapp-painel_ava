@@ -232,3 +232,13 @@ def test_migrations_0030_and_0031_migrate_a4_usuario(django_db_blocker):
 
     with connection.cursor() as cursor:
         cursor.execute('DROP TABLE IF EXISTS "a4_usuario" CASCADE;')
+
+
+def test_services_nao_usa_setting_oauth_obsoleto(settings):
+    """Regressão Sentry AVA-PAINEL-190: o setting OAUTH foi renomeado para SUAP_AUTH."""
+    import inspect
+
+    from painel.v1 import services
+
+    assert "settings.OAUTH" not in inspect.getsource(services)
+    assert settings.SUAP_AUTH["BASE_URL"]

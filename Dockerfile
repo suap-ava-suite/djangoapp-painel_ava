@@ -35,7 +35,7 @@ EXPOSE 8000
 WORKDIR /app/src
 ENTRYPOINT []
 
-CMD ["gunicorn"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && exec gunicorn"]
 
 
 #########################

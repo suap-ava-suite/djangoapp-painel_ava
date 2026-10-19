@@ -121,7 +121,12 @@ jobs:
           ssh-keyscan -H ${{ matrix.host }} >> ~/.ssh/known_hosts
 
       - name: Executar Upgrade via Docker Compose em ${{ matrix.host }}
-        run: ssh root@${{ matrix.host }} "/var/dockers/deploy.sh ${{ github.ref_name }}"
+        run: |
+          rc=0
+          ssh root@${{ matrix.host }} "/var/dockers/deploy.sh ${{ github.ref_name }}" || rc=$?
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ]; then
+            exit "$rc"
+          fi
 
       - name: Registrar Release e Deploy no Sentry para ${{ matrix.host }}
         env:

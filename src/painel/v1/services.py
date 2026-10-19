@@ -21,6 +21,8 @@ from painel.models import Ambiente, Curso
 
 logger = logging.getLogger(__name__)
 
+MENSAGEM_REGRA_NAO_AVALIADA = "Regra de autoinscrição não avaliada"
+
 
 CODIGO_DIARIO_REGEX = re.compile("^(\\d\\d\\d\\d\\d)\\.(\\d*)\\.(\\d*)\\.(.*)\\.(\\w*\\.\\d*)(#\\d*)?$")
 CODIGO_DIARIO_ANTIGO_ELEMENTS_COUNT = 5
@@ -111,7 +113,14 @@ def check_autoinscricao(regra: str, usuario_db) -> bool:
         return resultado
     except Exception as e:
         username = getattr(usuario_db, "username", "unknown")
-        logger.error(f'Erro ao avaliar para {username} a regra "{regra}". Erro: {e}. Contexto: {contexto}')
+        # Mensagem fixa e fingerprint único: todos os eventos caem numa só issue do Sentry
+        logger.warning(f'Erro ao avaliar para {username} a regra "{regra}". Erro: {e}. Contexto: {contexto}')
+        with sentry_sdk.new_scope() as scope:
+            scope.fingerprint = ["autoinscricao-regra-nao-avaliada"]
+            scope.set_context(
+                "autoinscricao", {"username": username, "regra": regra, "erro": str(e), "contexto": contexto}
+            )
+            sentry_sdk.capture_message(MENSAGEM_REGRA_NAO_AVALIADA, level="info")
         return False
 
 

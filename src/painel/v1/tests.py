@@ -269,3 +269,18 @@ def test_check_autoinscricao_usa_dados_brutos_e_vinculos_do_usuario():
     assert len(contexto["outras_matriculas"]) == 1
     assert check_autoinscricao("tipo_usuario in ['Aluno']", user) is True
     assert check_autoinscricao("tipo_usuario in ['Servidor']", user) is False
+
+
+@pytest.mark.django_db
+def test_check_autoinscricao_erro_na_regra_vai_para_uma_issue_unica_nivel_info():
+    """#86: falha ao avaliar a regra não é erro; agrupa num fingerprint fixo e loga em warning."""
+    from painel.v1.services import MENSAGEM_REGRA_NAO_AVALIADA, check_autoinscricao
+
+    user = get_user_model().objects.create_user(username="123")
+
+    with patch("painel.v1.services.sentry_sdk.capture_message") as capture, patch("painel.v1.services.logger") as log:
+        assert check_autoinscricao("chave_inexistente == 'x'", user) is False
+
+    capture.assert_called_once_with(MENSAGEM_REGRA_NAO_AVALIADA, level="info")
+    log.warning.assert_called_once()
+    log.error.assert_not_called()

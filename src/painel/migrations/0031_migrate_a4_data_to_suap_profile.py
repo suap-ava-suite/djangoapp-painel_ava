@@ -26,7 +26,14 @@ def migrate_a4_data_to_suap_profile(apps, schema_editor):
         if cursor.fetchone()[0] is None:
             return
 
+        # Dumps antigos de a4_usuario não têm a coluna "vinculos"
         cursor.execute("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'a4_usuario' AND column_name = 'vinculos'
+            """)
+        coluna_vinculos = 'u."vinculos"' if cursor.fetchone() else "NULL"
+
+        cursor.execute(f"""
             SELECT
                 u."id"::integer,
                 u."username",
@@ -43,10 +50,10 @@ def migrate_a4_data_to_suap_profile(apps, schema_editor):
                 u."settings",
                 u."first_login",
                 u."last_json",
-                u."vinculos"
+                {coluna_vinculos}
             FROM "a4_usuario" u
             INNER JOIN "auth_user" au ON au."id" = u."id"::integer
-            """)
+            """)  # noqa: S608 - coluna_vinculos é constante interna, não entrada externa
         rows = cursor.fetchall()
 
     Perfil = apps.get_model("django_suap_auth_profile", "Perfil")

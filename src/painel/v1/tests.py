@@ -311,3 +311,50 @@ def test_wait_db_levanta_erro_claro_ao_esgotar_o_tempo():
     with patch("manage.psycopg.connect", side_effect=psycopg.OperationalError("refused")), patch("manage.time.sleep"):
         with pytest.raises(RuntimeError, match="não respondeu"):
             manage._wait_db(timeout=0, interval=0)
+
+
+@pytest.mark.django_db
+def test_migration_0031_aceita_a4_usuario_sem_coluna_vinculos():
+    """Regressão #88: dumps antigos de a4_usuario não têm a coluna vinculos."""
+    import importlib
+
+    from django.apps import apps as django_apps
+    from django.db import connection
+
+    if connection.vendor != "postgresql":
+        pytest.skip("requer PostgreSQL")
+
+    m0031 = importlib.import_module("painel.migrations.0031_migrate_a4_data_to_suap_profile")
+    user = get_user_model().objects.create_user(username="99992", id=99992)
+
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            CREATE TABLE "a4_usuario" (
+                "id" bigint NOT NULL PRIMARY KEY, "username" text, "nome_usual" text, "nome_social" text,
+                "nome_registro" text, "nome" text, "email" text, "email_secundario" text,
+                "email_google_classroom" text, "email_academico" text, "foto" text, "tipo_usuario" text,
+                "settings" jsonb NULL, "first_login" timestamp with time zone NULL, "last_json" text NULL
+            );
+            INSERT INTO "a4_usuario" ("id", "username", "nome_usual", "last_json")
+            VALUES (99992, '99992', 'Sem Vinculos', '{"campus": "ZL"}');
+            """)
+
+    with connection.schema_editor() as schema_editor:
+        m0031.migrate_a4_data_to_suap_profile(django_apps, schema_editor)
+
+    assert get_user_model().objects.get(pk=user.pk).suap_profile.nome_usual == "Sem Vinculos"
+    with connection.cursor() as cursor:
+        cursor.execute('DROP TABLE IF EXISTS "a4_usuario" CASCADE;')
+
+
+@pytest.mark.django_db
+def test_migration_0027_ensure_auth_user_e_idempotente():
+    """Regressão #88: a 0027 garante auth_user antes de criar FKs; deve ser segura se já existir."""
+    import importlib
+
+    from django.apps import apps as django_apps
+    from django.db import connection
+
+    m0027 = importlib.import_module("painel.migrations.0027_configuracaoaba_historicalconfiguracaoaba")
+    with connection.schema_editor() as schema_editor:
+        m0027.ensure_auth_user(django_apps, schema_editor)

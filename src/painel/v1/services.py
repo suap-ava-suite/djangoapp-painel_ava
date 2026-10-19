@@ -58,12 +58,13 @@ def get_user_context(usuario_db) -> dict:
             return usuario_db.contexto
         return {}
 
-    raw_data_obj = getattr(profile, "raw_data", None)
-    last_json = dict(getattr(raw_data_obj, "data", {})) if raw_data_obj else {}
+    # DadosBrutos e Vinculo se ligam ao usuário (suap_raw_data / suap_vinculos), não ao Perfil
+    raw_data_obj = getattr(usuario_db, "suap_raw_data", None)
+    last_json = dict(getattr(raw_data_obj, "data", None) or {}) if raw_data_obj else {}
 
     matriculas = []
-    if hasattr(profile, "vinculos"):
-        for v in profile.vinculos.all():
+    if hasattr(usuario_db, "suap_vinculos"):
+        for v in usuario_db.suap_vinculos.all():
             det = dict(v.detalhamento or {})
             det.setdefault("nivel_ensino", v.nivel_ensino or "")
             det.setdefault("modalidade", v.modalidade or "")

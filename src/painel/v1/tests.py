@@ -242,3 +242,30 @@ def test_services_nao_usa_setting_oauth_obsoleto(settings):
 
     assert "settings.OAUTH" not in inspect.getsource(services)
     assert settings.SUAP_AUTH["BASE_URL"]
+
+
+@pytest.mark.django_db
+def test_check_autoinscricao_usa_dados_brutos_e_vinculos_do_usuario():
+    """Regressão #85: o contexto das regras vem de user.suap_raw_data e user.suap_vinculos."""
+    from django_suap_auth.profile.models import DadosBrutos, Perfil, Vinculo
+
+    from painel.v1.services import check_autoinscricao, get_user_context
+
+    user = get_user_model().objects.create_user(username="20252154360129")
+    Perfil.objects.create(user=user)
+    DadosBrutos.objects.create(user=user, data={"tipo_usuario": "Aluno"})
+    Vinculo.objects.create(
+        user=user,
+        identificador="20252154360129",
+        tipo="aluno",
+        ativo=True,
+        modalidade="Técnico integrado ao ensino médio",
+        detalhamento={"ativo": True, "modalidade": "Técnico integrado ao ensino médio"},
+    )
+    user = get_user_model().objects.get(pk=user.pk)
+
+    contexto = get_user_context(user)
+    assert contexto["tipo_usuario"] == "Aluno"
+    assert len(contexto["outras_matriculas"]) == 1
+    assert check_autoinscricao("tipo_usuario in ['Aluno']", user) is True
+    assert check_autoinscricao("tipo_usuario in ['Servidor']", user) is False

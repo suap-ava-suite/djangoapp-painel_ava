@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -56,7 +56,9 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Setup known_hosts
         run: |
@@ -77,6 +79,22 @@ jobs:
               --set image.tag=${{ github.ref_name }}
           "
 
+      - name: Registrar Release e Deploy no Sentry
+        env:
+          SENTRY_URL: ${{ vars.SENTRY_URL }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          if ! command -v sentry-cli >/dev/null 2>&1; then
+            export PATH="$RUNNER_TEMP:$PATH"
+            curl -sL https://sentry.io/get-cli/ | INSTALL_DIR="$RUNNER_TEMP" sh
+          fi
+          sentry-cli releases new "${{ github.ref_name }}"
+          sentry-cli releases set-commits "${{ github.ref_name }}" --local --ignore-missing
+          sentry-cli releases finalize "${{ github.ref_name }}"
+          sentry-cli deploys new --release "${{ github.ref_name }}" -e test
+
   deploy-to-prod:
     runs-on: [self-hosted, runner-dead]
     needs: publish-docker
@@ -93,7 +111,9 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Setup known_hosts
         run: |
@@ -102,3 +122,19 @@ jobs:
 
       - name: Executar Upgrade via Docker Compose em ${{ matrix.host }}
         run: ssh root@${{ matrix.host }} "/var/dockers/deploy.sh ${{ github.ref_name }}"
+
+      - name: Registrar Release e Deploy no Sentry para ${{ matrix.host }}
+        env:
+          SENTRY_URL: ${{ vars.SENTRY_URL }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          if ! command -v sentry-cli >/dev/null 2>&1; then
+            export PATH="$RUNNER_TEMP:$PATH"
+            curl -sL https://sentry.io/get-cli/ | INSTALL_DIR="$RUNNER_TEMP" sh
+          fi
+          sentry-cli releases new "${{ github.ref_name }}"
+          sentry-cli releases set-commits "${{ github.ref_name }}" --local --ignore-missing
+          sentry-cli releases finalize "${{ github.ref_name }}"
+          sentry-cli deploys new --release "${{ github.ref_name }}" -e production -n "${{ matrix.host }}"

@@ -76,7 +76,20 @@ Abra seu navegador no endereço: `http://localhost:8000 <http://localhost:8000>`
 5. Automação CI/CD no GitHub Actions
 ====================================
 
-O repositório possui um workflow automatizado em ``.github/workflows/docs.yml`` que executa as seguintes etapas:
+O repositório possui workflows automatizados em ``.github/workflows/``:
 
-1. **Pull Requests**: Valida se a documentação compila sem avisos ou erros (``sphinx-build -W``).
-2. **Push na branch main**: Compila a documentação e publica automaticamente a versão atualizada no **GitHub Pages**.
+- **Documentação (``docs.yml``)**:
+
+  1. **Pull Requests**: Valida se a documentação compila sem avisos ou erros (``sphinx-build -W``).
+  2. **Push na branch main**: Compila a documentação e publica automaticamente a versão atualizada no **GitHub Pages**.
+
+- **Build, Deploy e Sentry (``build-deploy.yml``)**:
+
+  1. **Publicação de imagem Docker**: Constrói e publica a imagem multi-arquitetura no Docker Hub ao publicar uma
+     release/tag.
+  2. **Deploy automatizado**: Atualiza o ambiente de homologação (``test``, tags com sufixo ``-test`` via Helm) ou os
+     servidores de produção (``production``, via Docker Compose).
+  3. **Registro no Sentry**: Registra a release, associa os commits locais
+     (``sentry-cli releases set-commits --local``), finaliza a versão e notifica o deploy no ambiente correspondente
+     (``test`` ou ``production``) utilizando a secret ``SENTRY_AUTH_TOKEN`` e as variáveis ``SENTRY_URL``,
+     ``SENTRY_ORG`` e ``SENTRY_PROJECT``.

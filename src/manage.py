@@ -10,7 +10,7 @@ from settings.databases import DATABASES  # noqa: F401
 from settings.indebug import DEBUG, TESTING_MODE  # noqa: F401
 
 
-def _wait_db():
+def _wait_db(timeout: float = 60.0, interval: float = 3.0) -> None:
     db = DATABASES["default"]
     host = db["HOST"]
     port = db["PORT"]
@@ -18,11 +18,16 @@ def _wait_db():
     user = db["USER"]
     password = db["PASSWORD"]
 
-    connection = psycopg.connect(host=host, port=port, dbname=dbname, user=user, password=password)
-
-    while connection.closed:
-        logging.info(f"ERROR: Aguardando o banco {host}:{port}/{dbname} subir")
-        time.sleep(3)
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            psycopg.connect(host=host, port=port, dbname=dbname, user=user, password=password).close()
+            return
+        except psycopg.OperationalError as e:
+            if time.monotonic() >= deadline:
+                raise RuntimeError(f"Banco {host}:{port}/{dbname} não respondeu em {timeout:.0f}s: {e}") from e
+            logging.warning(f"Aguardando o banco {host}:{port}/{dbname} subir: {e}")
+            time.sleep(interval)
 
 
 if __name__ == "__main__":

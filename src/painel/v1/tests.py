@@ -284,3 +284,30 @@ def test_check_autoinscricao_erro_na_regra_vai_para_uma_issue_unica_nivel_info()
     capture.assert_called_once_with(MENSAGEM_REGRA_NAO_AVALIADA, level="info")
     log.warning.assert_called_once()
     log.error.assert_not_called()
+
+
+def test_wait_db_tenta_novamente_ate_o_banco_aceitar_conexoes():
+    """#87: _wait_db aguarda o banco em vez de falhar na primeira tentativa."""
+    import manage
+
+    conexao = patch("manage.psycopg.connect").start()
+    try:
+        conexao.side_effect = [
+            psycopg.OperationalError("refused"),
+            psycopg.OperationalError("refused"),
+            conexao.return_value,
+        ]
+        with patch("manage.time.sleep") as sleep:
+            manage._wait_db(timeout=60, interval=0)
+        assert conexao.call_count == 3
+        assert sleep.call_count == 2
+    finally:
+        patch.stopall()
+
+
+def test_wait_db_levanta_erro_claro_ao_esgotar_o_tempo():
+    import manage
+
+    with patch("manage.psycopg.connect", side_effect=psycopg.OperationalError("refused")), patch("manage.time.sleep"):
+        with pytest.raises(RuntimeError, match="não respondeu"):
+            manage._wait_db(timeout=0, interval=0)

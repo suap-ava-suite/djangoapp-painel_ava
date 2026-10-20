@@ -4,6 +4,7 @@ import logging
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.http import HttpRequest, HttpResponse, JsonResponse
+from django_suap_auth.profile.models import Perfil
 from ninja import NinjaAPI
 
 from backup.api import router as backup_router
@@ -130,17 +131,18 @@ def set_user_preference_endpoint(
         username = user.username
 
         try:
-            user.refresh_from_db(fields=["settings"])
-            if user.settings is None:
-                user.settings = {}
+            # settings fica no Perfil (django_suap_auth), não em auth.User
+            profile, _ = Perfil.objects.get_or_create(user=user)
+            if profile.settings is None:
+                profile.settings = {}
 
-            if category not in user.settings:
-                user.settings[category] = {}
+            if category not in profile.settings:
+                profile.settings[category] = {}
 
             parsed_value = True if str(value).lower() == "true" else False if str(value).lower() == "false" else value
 
-            user.settings[category][key] = parsed_value
-            user.save(update_fields=["settings"])
+            profile.settings[category][key] = parsed_value
+            profile.save(update_fields=["settings"])
         except Exception:
             logger.exception("Falha ao salvar preferência local '%s'", key)
             return JsonResponse(

@@ -405,3 +405,20 @@ def test_sidebar_mostra_nome_usual_e_foto_do_suap_profile(client):
     html = response.content.decode()
     assert "Kelson Medeiros" in html
     assert "https://suap/foto/75x100/" in html
+
+
+@pytest.mark.django_db
+def test_set_user_preference_grava_settings_no_perfil(client):
+    """Regressão #94: settings fica em Perfil, não em auth.User."""
+    from django_suap_auth.profile.models import Perfil
+
+    user = get_user_model().objects.create_user(username="2080882")
+    client.force_login(user)
+
+    with patch("painel.v1.api.set_user_preference"):
+        response = client.get(
+            "/api/v1/set_user_preference/", {"category": "accessibility", "key": "dyslexia_friendly", "value": "true"}
+        )
+
+    assert response.status_code == 200
+    assert Perfil.objects.get(user=user).settings == {"accessibility": {"dyslexia_friendly": True}}

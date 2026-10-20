@@ -206,7 +206,9 @@ class UsuarioService:
         nome_usual = getattr(profile, "nome_usual", None) or user.first_name
         nome_registro = getattr(profile, "nome_registro", None) or f"{user.first_name} {user.last_name}".strip()
         tipo = getattr(profile, "tipo_usuario", "Servidor")
-        foto = getattr(profile, "url_foto_150x200", "")
+        raw_data = getattr(getattr(user, "suap_raw_data", None), "data", None) or {}
+        foto_75 = getattr(profile, "url_foto_75x100", None) or raw_data.get("foto") or ""
+        foto = getattr(profile, "url_foto_150x200", None) or foto_75
 
         return {
             "id": user.id,
@@ -230,7 +232,7 @@ class UsuarioService:
             "email_academico": getattr(profile, "email_academico", ""),
             "email_preferencial": getattr(profile, "email_preferencial", None) or user.email,
             "foto": foto,
-            "url_foto_75x100": foto,
+            "url_foto_75x100": foto_75 or foto,
             "url_foto_150x200": foto,
             "tipo_vinculo": tipo,
             "tipo_usuario": tipo,

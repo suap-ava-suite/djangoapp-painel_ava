@@ -358,3 +358,33 @@ def test_migration_0027_ensure_auth_user_e_idempotente():
     m0027 = importlib.import_module("painel.migrations.0027_configuracaoaba_historicalconfiguracaoaba")
     with connection.schema_editor() as schema_editor:
         m0027.ensure_auth_user(django_apps, schema_editor)
+
+
+@pytest.mark.django_db
+def test_usuario_info_usa_foto_75x100_quando_150x200_vazia():
+    """Regressão #89: o login SUAP grava só url_foto_75x100."""
+    from django_suap_auth.profile.models import DadosBrutos, Perfil
+
+    from painel.v2.services import UsuarioService
+
+    user = get_user_model().objects.create_user(username="2080882")
+    Perfil.objects.create(user=user, nome_usual="Kelson Medeiros", url_foto_75x100="https://suap/foto/75x100/")
+    DadosBrutos.objects.create(user=user, data={"foto": "https://suap/dados/foto/"})
+
+    info = UsuarioService.info("2080882")
+
+    assert info["nome_usual"] == "Kelson Medeiros"
+    assert info["foto"] == info["url_foto_150x200"] == info["url_foto_75x100"] == "https://suap/foto/75x100/"
+
+
+@pytest.mark.django_db
+def test_usuario_info_foto_cai_para_dados_brutos():
+    from django_suap_auth.profile.models import DadosBrutos, Perfil
+
+    from painel.v2.services import UsuarioService
+
+    user = get_user_model().objects.create_user(username="2080883")
+    Perfil.objects.create(user=user)
+    DadosBrutos.objects.create(user=user, data={"foto": "https://suap/dados/foto/"})
+
+    assert UsuarioService.info("2080883")["foto"] == "https://suap/dados/foto/"

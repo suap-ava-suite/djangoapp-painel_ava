@@ -128,12 +128,27 @@ jobs:
             exit "$rc"
           fi
 
-      - name: Registrar Release e Deploy no Sentry para ${{ matrix.host }}
+  sentry-release:
+    runs-on: [self-hosted, runner-dead]
+    needs: deploy-to-prod
+    # Só registra a release se os deploys de todos os hosts passaram
+    if: |
+      always() && needs.deploy-to-prod.result == 'success' &&
+      startsWith(github.ref, 'refs/tags/') && !endsWith(github.ref_name, '-test')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Registrar Release e Deploys no Sentry
         env:
           SENTRY_URL: ${{ vars.SENTRY_URL }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          PROD_HOSTS: ${{ vars.PROD_HOST_1 }} ${{ vars.PROD_HOST_2 }} ${{ vars.PROD_HOST_3 }}
         run: |
           if ! command -v sentry-cli >/dev/null 2>&1; then
             export PATH="$RUNNER_TEMP:$PATH"
@@ -142,4 +157,6 @@ jobs:
           sentry-cli releases new "${{ github.ref_name }}"
           sentry-cli releases set-commits "${{ github.ref_name }}" --local --ignore-missing
           sentry-cli releases finalize "${{ github.ref_name }}"
-          sentry-cli deploys new --release "${{ github.ref_name }}" -e production -n "${{ matrix.host }}"
+          for host in $PROD_HOSTS; do
+            sentry-cli deploys new --release "${{ github.ref_name }}" -e production -n "$host"
+          done

@@ -5,14 +5,14 @@
             data-bs-toggle="dropdown"
             aria-expanded="false"
             aria-label="Menu usuário">
-        <img width="56" height="56" src="{{ logged_user.foto_url }}" alt="Minha foto" />
-        <span class="user_name">{{ logged_user.show_name }}</span>
+        <img width="56" height="56" src="{{ logged_user.suap_profile.foto_url }}" alt="Minha foto" />
+        <span class="user_name">{{ logged_user.suap_profile.show_name|default:logged_user.username }}</span>
     </button>
     <ul class="dropdown-menu dropdown-user"
         aria-labelledby="header-user-dropdown">
         <li>
             <span>
-                <h6 class="dropdown-header">{{ logged_user.show_name }}</h6>
+                <h6 class="dropdown-header">{{ logged_user.suap_profile.show_name|default:logged_user.username }}</h6>
             </span>
         </li>
         <li>

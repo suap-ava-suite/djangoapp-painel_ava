@@ -388,3 +388,20 @@ def test_usuario_info_foto_cai_para_dados_brutos():
     DadosBrutos.objects.create(user=user, data={"foto": "https://suap/dados/foto/"})
 
     assert UsuarioService.info("2080883")["foto"] == "https://suap/dados/foto/"
+
+
+@pytest.mark.django_db
+def test_sidebar_mostra_nome_usual_e_foto_do_suap_profile(client):
+    """Regressão #90: show_name e foto_url ficam em user.suap_profile, não em auth.User."""
+    from django_suap_auth.profile.models import Perfil
+
+    user = get_user_model().objects.create_user(username="2080882")
+    Perfil.objects.create(user=user, nome_usual="Kelson Medeiros", url_foto_75x100="https://suap/foto/75x100/")
+    client.force_login(user)
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert "Kelson Medeiros" in html
+    assert "https://suap/foto/75x100/" in html

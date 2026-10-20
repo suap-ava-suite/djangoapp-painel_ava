@@ -10,17 +10,17 @@
     <div class="sidebar-content-body">
 
         <div class="sidebar-user-content">
-            {% if logged_user.foto_url %}
+            {% if logged_user.suap_profile.foto_url %}
                 <div class="sidebar-user-content-profile" @click="toggleModalWithContent('profile')"
                      :class="{'active': modalType === 'profile'}" id="btn-toggle-profile">
-                    <img src="{{ logged_user.foto_url }}" alt="Imagem de perfil" class="profile-image">
-                    <span>{{ logged_user.show_name }}</span>
+                    <img src="{{ logged_user.suap_profile.foto_url }}" alt="Imagem de perfil" class="profile-image">
+                    <span>{{ logged_user.suap_profile.show_name|default:logged_user.username }}</span>
                 </div>
             {% else %}
                 <div class="sidebar-user-content-profile" @click="toggleModalWithContent('profile')"
                      :class="{'active': modalType === 'profile'}" id="btn-toggle-profile">
                     <img src="{% static 'theme/ifrn25/img/user.png' %}" alt="Imagem de perfil" class="profile-image">
-                    <span>{{ logged_user.show_name }}</span>
+                    <span>{{ logged_user.suap_profile.show_name|default:logged_user.username }}</span>
                 </div>
             {% endif %}
             <div class="sidebar-user-content-options">

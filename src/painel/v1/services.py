@@ -2,6 +2,7 @@ import concurrent
 import json
 import logging
 import re
+import time
 import urllib.parse
 from functools import lru_cache
 from http.client import HTTPException
@@ -22,6 +23,11 @@ from painel.models import Ambiente, Curso
 logger = logging.getLogger(__name__)
 
 MENSAGEM_REGRA_NAO_AVALIADA = "Regra de autoinscrição não avaliada"
+MENSAGEM_FALHA_MOODLE = "Falha de comunicação com o Moodle"
+MOODLE_USUARIO_NAO_ENCONTRADO = "Usuário não encontrado."
+
+HTTP_CONNECTION_RETRIES = 1
+HTTP_RETRY_BACKOFF = 0.3
 
 
 CODIGO_DIARIO_REGEX = re.compile("^(\\d\\d\\d\\d\\d)\\.(\\d*)\\.(\\d*)\\.(.*)\\.(\\w*\\.\\d*)(#\\d*)?$")
@@ -94,7 +100,7 @@ def get_user_context(usuario_db) -> dict:
     return last_json
 
 
-def check_autoinscricao(regra: str, usuario_db) -> bool:
+def check_autoinscricao(regra: str, usuario_db, contexto: Union[dict, None] = None) -> bool:
     if not regra or not str(regra).strip() or not usuario_db:
         return False
 
@@ -104,7 +110,8 @@ def check_autoinscricao(regra: str, usuario_db) -> bool:
         logger.error(f"Regra inválida: {e}. {regra}")
         return False
 
-    contexto = get_user_context(usuario_db)
+    if contexto is None:
+        contexto = get_user_context(usuario_db)
     try:
         resultado = rule.matches(contexto)
         username = getattr(usuario_db, "username", "unknown")
@@ -128,11 +135,27 @@ def _filtrar_autoinscricoes(autoinscricoes: list, usuario_db) -> list:
     if not autoinscricoes or not usuario_db:
         return []
 
-    return [c for c in autoinscricoes if check_autoinscricao(c.get("restricoes_de_autoinscricao", ""), usuario_db)]
+    # Contexto montado uma única vez (evita N+1 em suap_vinculos a cada curso)
+    contexto = get_user_context(usuario_db)
+    return [
+        c for c in autoinscricoes if check_autoinscricao(c.get("restricoes_de_autoinscricao", ""), usuario_db, contexto)
+    ]
+
+
+def _get_with_retry(url, headers, **kwargs):
+    """Uma nova tentativa para falhas de conexão (timeout de conexão, DNS e TLS), que costumam ser transitórias."""
+    for tentativa in range(1 + HTTP_CONNECTION_RETRIES):
+        try:
+            return requests.get(url, headers=headers, timeout=settings.DEFAULT_HTTP_TIMEOUT, **kwargs)
+        except requests.exceptions.ConnectionError as e:
+            if tentativa >= HTTP_CONNECTION_RETRIES:
+                raise
+            logger.info(f"Falha de conexão em {url}, nova tentativa em {HTTP_RETRY_BACKOFF}s: {e}")
+            time.sleep(HTTP_RETRY_BACKOFF)
 
 
 def requests_get(url, headers={}, encoding="utf-8", decode=True, **kwargs):
-    response = requests.get(url, headers=headers, timeout=settings.DEFAULT_HTTP_TIMEOUT, **kwargs)
+    response = _get_with_retry(url, headers, **kwargs)
     byte_array_content = response.content
     content = byte_array_content.decode(encoding) if decode and encoding is not None else byte_array_content
     if response.ok:
@@ -140,12 +163,15 @@ def requests_get(url, headers={}, encoding="utf-8", decode=True, **kwargs):
     else:
         split_url = urllib.parse.urlsplit(url)
         safe_url = f"{split_url.scheme}://{split_url.netloc}{split_url.path}"
-        logger.error(f"Error fetching {safe_url}: {response.status_code} - {response.reason}")
+        # 404 do plugin é decidido em get_json_api (usuário ausente é esperado); não gera evento aqui
+        log = logger.info if response.status_code == 404 else logger.error
+        log(f"Error fetching {safe_url}: {response.status_code} - {response.reason}")
         exc = HTTPException("%s - %s" % (response.status_code, response.reason))
         exc.status = response.status_code
         exc.reason = response.reason
         exc.headers = response.headers
         exc.url = url
+        exc.body = content
         raise exc
 
 
@@ -162,9 +188,37 @@ def get_json_api(ava: Ambiente, service: str, **params: dict):
     url = f"{ava.moodle_base_api_url}/?{service}&{querystring}"
     try:
         return get_json(url, headers={"Authentication": f"Token {ava.token}"})
-    except (requests.exceptions.RequestException, HTTPException) as e:
-        logger.error(f"⚠️ TIMEOUT OU ERRO DE REDE no Moodle '{ava.nome}' ao acessar {url}: {e}")
+    except HTTPException as e:
+        if _usuario_nao_encontrado(e):
+            logger.info(f"Moodle '{ava.nome}': usuário não encontrado em {service}")
+            return None
+        _registrar_falha_moodle(ava, service, url, e)
         return None
+    except (requests.exceptions.RequestException, ValueError) as e:
+        _registrar_falha_moodle(ava, service, url, e)
+        return None
+
+
+def _usuario_nao_encontrado(exc: HTTPException) -> bool:
+    """404 do tool_painelava com 'Usuário não encontrado.' (o 404 'Serviço não existe' continua sendo falha)."""
+    if getattr(exc, "status", None) != 404:
+        return False
+    try:
+        mensagem = json.loads(getattr(exc, "body", "") or "")["error"]["message"]
+    except ValueError, KeyError, TypeError:
+        return False
+    return mensagem == MOODLE_USUARIO_NAO_ENCONTRADO
+
+
+def _registrar_falha_moodle(ava: Ambiente, service: str, url: str, exc: Exception) -> None:
+    """Falha transitória/de resposta do Moodle: warning e uma única issue no Sentry (fingerprint fixo)."""
+    logger.warning(f"⚠️ Falha ao acessar o Moodle '{ava.nome}' em {url}: {type(exc).__name__}: {exc}")
+    with sentry_sdk.new_scope() as scope:
+        scope.fingerprint = ["moodle-falha-de-comunicacao"]
+        scope.set_context(
+            "moodle", {"ambiente": ava.nome, "servico": service, "url": url, "erro": f"{type(exc).__name__}: {exc}"}
+        )
+        sentry_sdk.capture_message(MENSAGEM_FALHA_MOODLE, level="warning")
 
 
 def get_diarios(

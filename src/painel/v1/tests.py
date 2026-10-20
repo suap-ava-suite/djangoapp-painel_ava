@@ -1,8 +1,9 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import psycopg
 import psycopg_pool
 import pytest
+import requests
 from django.contrib.auth import get_user_model
 from django.core.exceptions import DisallowedHost, SuspiciousOperation
 from django.http import HttpResponse
@@ -121,6 +122,120 @@ def test_get_json_api_catches_http_exception(mock_get_json):
 
     result = get_json_api(ambiente, "enrol_course", courseid=123, username="testuser")
     assert result is None
+
+
+def _ambiente_teste():
+    return Ambiente.objects.create(
+        nome="Moodle de Teste", url="http://moodle-teste.ifrn.edu.br", token="token123", cor_mestra="#ffffff"
+    )
+
+
+def _resposta(status, corpo, reason="X"):
+    resp = MagicMock()
+    resp.ok = 200 <= status < 300
+    resp.status_code = status
+    resp.reason = reason
+    resp.content = corpo.encode("utf-8")
+    resp.headers = {}
+    return resp
+
+
+@pytest.mark.django_db
+def test_get_json_api_404_usuario_nao_encontrado_nao_gera_evento():
+    """#96: 404 'Usuário não encontrado.' do plugin é esperado: resultado vazio, sem erro nem evento Sentry."""
+    from painel.v1.services import get_json_api
+
+    corpo = '{"error": {"message": "Usuário não encontrado.", "code": 404}}'
+    with (
+        patch("painel.v1.services.requests.get", return_value=_resposta(404, corpo, "Not Found")),
+        patch("painel.v1.services.sentry_sdk.capture_message") as capture,
+        patch("painel.v1.services.logger") as log,
+    ):
+        assert get_json_api(_ambiente_teste(), "set_user_preference", username="x") is None
+
+    capture.assert_not_called()
+    log.error.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_get_json_api_404_servico_inexistente_continua_sendo_falha():
+    from painel.v1.services import MENSAGEM_FALHA_MOODLE, get_json_api
+
+    corpo = '{"error": {"message": "Serviço não existe", "code": 404}}'
+    with (
+        patch("painel.v1.services.requests.get", return_value=_resposta(404, corpo, "Not Found")),
+        patch("painel.v1.services.sentry_sdk.capture_message") as capture,
+    ):
+        assert get_json_api(_ambiente_teste(), "inexistente") is None
+
+    capture.assert_called_once_with(MENSAGEM_FALHA_MOODLE, level="warning")
+
+
+@pytest.mark.django_db
+def test_get_json_api_resposta_nao_json_retorna_none():
+    """#96: JSONDecodeError (ValueError) não pode virar 500."""
+    from painel.v1.services import MENSAGEM_FALHA_MOODLE, get_json_api
+
+    with (
+        patch("painel.v1.services.requests.get", return_value=_resposta(200, "<html>erro</html>")),
+        patch("painel.v1.services.sentry_sdk.capture_message") as capture,
+    ):
+        assert get_json_api(_ambiente_teste(), "enrol_course") is None
+
+    capture.assert_called_once_with(MENSAGEM_FALHA_MOODLE, level="warning")
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "erro",
+    [
+        requests.exceptions.ConnectTimeout("connect timeout"),
+        requests.exceptions.SSLError("UNEXPECTED_EOF_WHILE_READING"),
+        requests.exceptions.ConnectionError("Failed to resolve"),
+    ],
+)
+def test_get_json_api_refaz_uma_vez_falha_de_conexao(erro):
+    from painel.v1.services import get_json_api
+
+    with (
+        patch("painel.v1.services.time.sleep"),
+        patch("painel.v1.services.requests.get", side_effect=[erro, _resposta(200, '{"ok": true}')]) as get,
+    ):
+        assert get_json_api(_ambiente_teste(), "get_diarios") == {"ok": True}
+
+    assert get.call_count == 2
+
+
+@pytest.mark.django_db
+def test_get_json_api_falha_de_conexao_persistente_vai_para_uma_issue_unica_nivel_warning():
+    from painel.v1.services import MENSAGEM_FALHA_MOODLE, get_json_api
+
+    with (
+        patch("painel.v1.services.time.sleep"),
+        patch("painel.v1.services.requests.get", side_effect=requests.exceptions.ConnectTimeout("t")) as get,
+        patch("painel.v1.services.sentry_sdk.capture_message") as capture,
+        patch("painel.v1.services.logger") as log,
+    ):
+        assert get_json_api(_ambiente_teste(), "get_diarios") is None
+
+    assert get.call_count == 2
+    capture.assert_called_once_with(MENSAGEM_FALHA_MOODLE, level="warning")
+    log.warning.assert_called_once()
+    log.error.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_filtrar_autoinscricoes_monta_contexto_uma_vez():
+    """#96: evita N+1 em suap_vinculos (um get_user_context por curso)."""
+    from painel.v1.services import _filtrar_autoinscricoes
+
+    user = get_user_model().objects.create_user(username="123")
+    cursos = [{"restricoes_de_autoinscricao": "true"} for _ in range(5)]
+
+    with patch("painel.v1.services.get_user_context", return_value={}) as ctx:
+        assert len(_filtrar_autoinscricoes(cursos, user)) == 5
+
+    ctx.assert_called_once()
 
 
 @pytest.mark.django_db

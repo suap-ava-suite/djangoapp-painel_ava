@@ -144,14 +144,14 @@ def _filtrar_autoinscricoes(autoinscricoes: list, usuario_db) -> list:
 
 def _get_with_retry(url, headers, **kwargs):
     """Uma nova tentativa para falhas de conexão (timeout de conexão, DNS e TLS), que costumam ser transitórias."""
-    for tentativa in range(1 + HTTP_CONNECTION_RETRIES):
+    for _ in range(HTTP_CONNECTION_RETRIES):
         try:
             return requests.get(url, headers=headers, timeout=settings.DEFAULT_HTTP_TIMEOUT, **kwargs)
         except requests.exceptions.ConnectionError as e:
-            if tentativa >= HTTP_CONNECTION_RETRIES:
-                raise
             logger.info(f"Falha de conexão em {url}, nova tentativa em {HTTP_RETRY_BACKOFF}s: {e}")
             time.sleep(HTTP_RETRY_BACKOFF)
+    # Última tentativa: a exceção, se houver, sobe para o chamador
+    return requests.get(url, headers=headers, timeout=settings.DEFAULT_HTTP_TIMEOUT, **kwargs)
 
 
 def requests_get(url, headers={}, encoding="utf-8", decode=True, **kwargs):

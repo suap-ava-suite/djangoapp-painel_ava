@@ -79,22 +79,6 @@ jobs:
               --set image.tag=${{ github.ref_name }}
           "
 
-      - name: Registrar Release e Deploy no Sentry
-        env:
-          SENTRY_URL: ${{ vars.SENTRY_URL }}
-          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: |
-          if ! command -v sentry-cli >/dev/null 2>&1; then
-            export PATH="$RUNNER_TEMP:$PATH"
-            curl -sL https://sentry.io/get-cli/ | INSTALL_DIR="$RUNNER_TEMP" sh
-          fi
-          sentry-cli releases new "${{ github.ref_name }}"
-          sentry-cli releases set-commits "${{ github.ref_name }}" --local --ignore-missing
-          sentry-cli releases finalize "${{ github.ref_name }}"
-          sentry-cli deploys new --release "${{ github.ref_name }}" -e test
-
   deploy-to-prod:
     runs-on: [self-hosted, runner-dead]
     needs: publish-docker
@@ -130,11 +114,12 @@ jobs:
 
   sentry-release:
     runs-on: [self-hosted, runner-dead]
-    needs: deploy-to-prod
-    # Só registra a release se os deploys de todos os hosts passaram
+    needs: [deploy-to-test, deploy-to-prod]
+    # Só registra se algum deploy rodou e nenhum falhou ou foi cancelado
     if: |
-      always() && needs.deploy-to-prod.result == 'success' &&
-      startsWith(github.ref, 'refs/tags/') && !endsWith(github.ref_name, '-test')
+      always() && startsWith(github.ref, 'refs/tags/') &&
+      !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') &&
+      (needs.deploy-to-test.result == 'success' || needs.deploy-to-prod.result == 'success')
 
     steps:
       - name: Checkout code
@@ -157,6 +142,10 @@ jobs:
           sentry-cli releases new "${{ github.ref_name }}"
           sentry-cli releases set-commits "${{ github.ref_name }}" --local --ignore-missing
           sentry-cli releases finalize "${{ github.ref_name }}"
-          for host in $PROD_HOSTS; do
-            sentry-cli deploys new --release "${{ github.ref_name }}" -e production -n "$host"
-          done
+          if [ "${{ endsWith(github.ref_name, '-test') }}" = "true" ]; then
+            sentry-cli deploys new --release "${{ github.ref_name }}" -e test
+          else
+            for host in $PROD_HOSTS; do
+              sentry-cli deploys new --release "${{ github.ref_name }}" -e production -n "$host"
+            done
+          fi

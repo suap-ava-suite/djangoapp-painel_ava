@@ -239,6 +239,62 @@ def test_filtrar_autoinscricoes_monta_contexto_uma_vez():
 
 
 @pytest.mark.django_db
+def test_get_diarios_nao_usa_orm_nas_threads_do_pool():
+    """Chamado #561508: ORM em thread do ThreadPoolExecutor abre uma conexão por thread que nunca é fechada."""
+    import threading
+
+    from painel.v1.services import get_diarios
+
+    get_user_model().objects.create_user(username="123")
+    principal = threading.get_ident()
+    threads_orm = []
+    threads_http = []
+
+    def _get_json_api(*args, **kwargs):
+        threads_http.append(threading.get_ident())
+        return {
+            "diarios": [
+                {
+                    "shortname": "x",
+                    "curso_codigo": "123",
+                    "diario_id": 1,
+                    "viewurl": "http://moodle/course/view.php?id=1",
+                }
+            ],
+            "autoinscricoes": [{"id": 1, "restricoes_de_autoinscricao": "true"}],
+        }
+
+    def _contexto(*args, **kwargs):
+        threads_orm.append(threading.get_ident())
+        return {}
+
+    def _filter(*args, **kwargs):
+        threads_orm.append(threading.get_ident())
+        return MagicMock(first=MagicMock(return_value=None))
+
+    cache = MagicMock()
+    cache.get.return_value = None
+    with (
+        patch("painel.v1.services.Ambiente.cached", return_value=[_ambiente_teste()]),
+        patch("painel.v1.services.Ambiente.as_dict", return_value=[]),
+        patch("painel.v1.services.get_json_api", side_effect=_get_json_api),
+        patch("painel.v1.services.get_user_context", side_effect=_contexto),
+        patch("painel.v1.services.Curso.objects") as curso_objects,
+        patch("painel.v1.services.cache", cache),
+        patch("painel.v1.services.connections") as connections,
+    ):
+        curso_objects.filter.side_effect = _filter
+        resultado = get_diarios("123")
+
+    assert len(resultado["diarios"]) == 1
+    assert len(resultado["autoinscricoes"]) == 1
+    assert threads_http
+    assert principal not in threads_http, "a consulta ao Moodle deve rodar em thread auxiliar"
+    assert threads_orm and set(threads_orm) == {principal}, "ORM só pode rodar na thread da requisição"
+    connections.close_all.assert_called()
+
+
+@pytest.mark.django_db
 @patch("painel.views.get_json_api")
 def test_enrol_course_handles_api_http_exception(mock_get_json_api, client):
     User = get_user_model()

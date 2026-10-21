@@ -14,6 +14,7 @@ import sentry_sdk
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.db import connections
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 
@@ -371,6 +372,9 @@ def get_diarios(
         except Exception as e:
             logging.error(e)
             sentry_sdk.capture_exception(e)
+        finally:
+            # O encerramento da requisição não alcança as conexões locais deste worker.
+            connections.close_all()
 
     def deduplicate_and_sort(list_of_dict: Union[None, List[Dict[str, str]]], reverse: bool = False):
         deduplicated = [{"id": x, "label": y} for x, y in ({x["id"]: x["label"] for x in list_of_dict}).items()]

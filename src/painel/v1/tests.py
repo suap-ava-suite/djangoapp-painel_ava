@@ -5,12 +5,13 @@ import psycopg_pool
 import pytest
 import requests
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.exceptions import DisallowedHost, SuspiciousOperation
 from django.http import HttpResponse
 from django.test import RequestFactory
 
 from painel.middleware import ExceptionMiddleware
-from painel.models import Ambiente
+from painel.models import Ambiente, Curso
 
 
 def test_exception_middleware_handles_allowed_exceptions(rf: RequestFactory):
@@ -236,6 +237,93 @@ def test_filtrar_autoinscricoes_monta_contexto_uma_vez():
         assert len(_filtrar_autoinscricoes(cursos, user)) == 5
 
     ctx.assert_called_once()
+
+
+@pytest.fixture
+def usuario_com_diarios(transactional_db, settings):
+    from django_suap_auth.profile.models import DadosBrutos, Perfil, Vinculo
+
+    settings.CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+    cache.clear()
+    Ambiente.objects.update(active=False)
+    user = get_user_model().objects.create_user(username="aluno-diarios")
+    Perfil.objects.create(user=user)
+    DadosBrutos.objects.create(user=user, data={"tipo_usuario": "Aluno"})
+    Vinculo.objects.create(user=user, identificador=user.username, campus="ZL", ativo=True)
+    ambientes = [
+        Ambiente.objects.create(
+            nome=f"Moodle {number}",
+            url=f"https://moodle-{number}.invalid",
+            token="fixture",
+            cor_mestra="#000000",
+        )
+        for number in range(3)
+    ]
+    cursos = {ava.pk: Curso.objects.create(codigo=f"curso-{ava.pk}", nome=f"Curso {ava.pk}") for ava in ambientes}
+    yield user, ambientes, cursos
+    cache.clear()
+
+
+@pytest.mark.parametrize("curso_no_cache", [False, True])
+def test_get_diarios_reune_cursos_e_filtra_autoinscricoes(usuario_com_diarios, curso_no_cache):
+    from painel.v1.services import get_diarios
+
+    user, ambientes, cursos = usuario_com_diarios
+    if curso_no_cache:
+        for curso in cursos.values():
+            cache.set(f"curso:{curso.codigo}", curso)
+
+    def resposta_moodle(ambiente, servico, **params):
+        return {
+            "diarios": [{"id": 1, "fullname": "Diário", "curso_codigo": cursos[ambiente.pk].codigo}],
+            "autoinscricoes": [
+                {
+                    "id": 2,
+                    "fullname": "Curso para alunos de ZL",
+                    "restricoes_de_autoinscricao": "tipo_usuario == 'Aluno' and outras_matriculas[0]['campus'] == 'ZL'",
+                },
+                {
+                    "id": 3,
+                    "fullname": "Curso para servidores",
+                    "restricoes_de_autoinscricao": "tipo_usuario == 'Servidor'",
+                },
+            ],
+        }
+
+    with patch("painel.v1.services.get_json_api", side_effect=resposta_moodle):
+        for _ in range(3):
+            result = get_diarios(user.username, q="")
+
+            assert {(d["ambiente"]["id"], d["curso"]["codigo"], d["curso"]["nome"]) for d in result["diarios"]} == {
+                (ava.pk, cursos[ava.pk].codigo, cursos[ava.pk].nome) for ava in ambientes
+            }
+            assert {(c["ambiente"]["id"], c["id"], c["fullname"]) for c in result["autoinscricoes"]} == {
+                (ava.pk, 2, "Curso para alunos de ZL") for ava in ambientes
+            }
+
+
+def test_get_diarios_preserva_outros_ambientes_apos_resposta_invalida(usuario_com_diarios):
+    from painel.v1.services import get_diarios
+
+    user, ambientes, cursos = usuario_com_diarios
+    ambiente_com_falha = ambientes[0]
+
+    def resposta_moodle(ambiente, servico, **params):
+        diarios = [{"id": 1, "fullname": "Diário", "curso_codigo": cursos[ambiente.pk].codigo}]
+        if ambiente.pk == ambiente_com_falha.pk:
+            diarios.append(None)
+        return {"diarios": diarios}
+
+    with (
+        patch("painel.v1.services.get_json_api", side_effect=resposta_moodle),
+        patch("painel.v1.services.sentry_sdk.capture_exception"),
+    ):
+        for _ in range(3):
+            result = get_diarios(user.username, q="")
+
+            assert {(d["ambiente"]["id"], d["curso"]["codigo"], d["curso"]["nome"]) for d in result["diarios"]} == {
+                (ava.pk, cursos[ava.pk].codigo, cursos[ava.pk].nome) for ava in ambientes[1:]
+            }
 
 
 @pytest.mark.django_db

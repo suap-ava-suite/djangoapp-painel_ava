@@ -1,11 +1,9 @@
 from typing import Dict
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.http import HttpRequest
 from django.urls import reverse
 from django.utils.translation import gettext as _
-
 from django_suap_auth.impersonation.helpers import get_active_user, is_impersonating
 
 from painel import get_active_themes, get_installed_themes
@@ -32,6 +30,7 @@ def layout_settings(request: HttpRequest) -> dict:
         "hostname": settings.HOSTNAME,
         "gtag": settings.GTAG_CODE if hasattr(settings, "GTAG_CODE") else False,
         "clarity": settings.CLARITY_CODE if hasattr(settings, "CLARITY_CODE") else False,
+        "sentry_js": getattr(settings, "SENTRY_JS", None),
         "ambientes": Ambiente.cached(),
         "admins": Ambiente.admins(),
         "installed_themes": get_installed_themes(),

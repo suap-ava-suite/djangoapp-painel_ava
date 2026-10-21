@@ -2,10 +2,10 @@
 from sc4py.env import env, env_as_bool, env_as_int
 
 if env("GTAG_CODE") is not None:
-    GTAG_CODE = env("GTAG_CODE") # noqa
+    GTAG_CODE = env("GTAG_CODE")  # noqa
 
 if env("CLARITY_CODE") is not None:
-    CLARITY_CODE = env("CLARITY_CODE") # noqa
+    CLARITY_CODE = env("CLARITY_CODE")  # noqa
 
 if env("SENTRY_DNS") is not None:
     import logging
@@ -55,3 +55,16 @@ if env("SENTRY_DNS") is not None:
     )
     sentry_sdk.init(**SENTRY_SETTINGS)
     ignore_logger("gunicorn.error")
+
+# Sentry do JavaScript (navegador): DSN próprio, independente do SENTRY_DNS do Django.
+# Sem SENTRY_JS_DSN, o front-end não carrega o SDK nem envia nada.
+if env("SENTRY_JS_DSN") is not None:
+    from settings.project import APP_VERSION as _SENTRY_JS_APP_VERSION
+
+    SENTRY_JS = dict(  # noqa
+        dsn=env("SENTRY_JS_DSN"),
+        environment=env("SENTRY_JS_ENVIRONMENT", env("SENTRY_ENVIRONMENT", "local")),
+        release=env("SENTRY_RELEASE", _SENTRY_JS_APP_VERSION),
+        # Informe em porcentual, ou seja, 50 significa que 50% dos erros serão reportados.
+        sampleRate=env_as_int("SENTRY_JS_SAMPLE_RATE", 100) / 100.0,
+    )

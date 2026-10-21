@@ -93,3 +93,17 @@ O repositório possui workflows automatizados em ``.github/workflows/``:
      (``sentry-cli releases set-commits --local``), finaliza a versão e notifica o deploy no ambiente correspondente
      (``test`` ou ``production``) utilizando a secret ``SENTRY_AUTH_TOKEN`` e as variáveis ``SENTRY_URL``,
      ``SENTRY_ORG`` e ``SENTRY_PROJECT``.
+
+Sentry no navegador (JavaScript)
+--------------------------------
+
+Os erros de JavaScript do tema ``ifrn25`` (inclusive os de "Erro de comunicação com o servidor")
+são enviados ao Sentry **somente** se a variável ``SENTRY_JS_DSN`` estiver definida. Ela é
+independente de ``SENTRY_DNS`` (Django), então pode apontar para outro projeto do Sentry.
+
+- ``SENTRY_JS_DSN``: DSN do projeto JavaScript. Sem ela, o SDK não é carregado e nada é enviado.
+- ``SENTRY_JS_ENVIRONMENT``: ambiente (padrão: ``SENTRY_ENVIRONMENT`` ou ``local``).
+- ``SENTRY_JS_SAMPLE_RATE``: porcentagem de erros reportados (padrão: ``100``).
+- ``SENTRY_RELEASE``: release (padrão: versão da aplicação).
+
+Erros originados em arquivos da pasta ``vendors`` são descartados.

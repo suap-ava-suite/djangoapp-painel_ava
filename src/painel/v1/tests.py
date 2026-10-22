@@ -5,12 +5,13 @@ import psycopg_pool
 import pytest
 import requests
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.exceptions import DisallowedHost, SuspiciousOperation
 from django.http import HttpResponse
 from django.test import RequestFactory
 
 from painel.middleware import ExceptionMiddleware
-from painel.models import Ambiente
+from painel.models import Ambiente, Curso
 
 
 def test_exception_middleware_handles_allowed_exceptions(rf: RequestFactory):
@@ -238,60 +239,91 @@ def test_filtrar_autoinscricoes_monta_contexto_uma_vez():
     ctx.assert_called_once()
 
 
-@pytest.mark.django_db
-def test_get_diarios_nao_usa_orm_nas_threads_do_pool():
-    """Chamado #561508: ORM em thread do ThreadPoolExecutor abre uma conexão por thread que nunca é fechada."""
-    import threading
+@pytest.fixture
+def usuario_com_diarios(transactional_db, settings):
+    from django_suap_auth.profile.models import DadosBrutos, Perfil, Vinculo
 
+    settings.CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+    cache.clear()
+    Ambiente.objects.update(active=False)
+    user = get_user_model().objects.create_user(username="aluno-diarios")
+    Perfil.objects.create(user=user)
+    DadosBrutos.objects.create(user=user, data={"tipo_usuario": "Aluno"})
+    Vinculo.objects.create(user=user, identificador=user.username, campus="ZL", ativo=True)
+    ambientes = [
+        Ambiente.objects.create(
+            nome=f"Moodle {number}",
+            url=f"https://moodle-{number}.invalid",
+            token="fixture",
+            cor_mestra="#000000",
+        )
+        for number in range(3)
+    ]
+    cursos = {ava.pk: Curso.objects.create(codigo=f"curso-{ava.pk}", nome=f"Curso {ava.pk}") for ava in ambientes}
+    yield user, ambientes, cursos
+    cache.clear()
+
+
+@pytest.mark.parametrize("curso_no_cache", [False, True])
+def test_get_diarios_reune_cursos_e_filtra_autoinscricoes(usuario_com_diarios, curso_no_cache):
     from painel.v1.services import get_diarios
 
-    get_user_model().objects.create_user(username="123")
-    principal = threading.get_ident()
-    threads_orm = []
-    threads_http = []
+    user, ambientes, cursos = usuario_com_diarios
+    if curso_no_cache:
+        for curso in cursos.values():
+            cache.set(f"curso:{curso.codigo}", curso)
 
-    def _get_json_api(*args, **kwargs):
-        threads_http.append(threading.get_ident())
+    def resposta_moodle(ambiente, servico, **params):
         return {
-            "diarios": [
+            "diarios": [{"id": 1, "fullname": "Diário", "curso_codigo": cursos[ambiente.pk].codigo}],
+            "autoinscricoes": [
                 {
-                    "shortname": "x",
-                    "curso_codigo": "123",
-                    "diario_id": 1,
-                    "viewurl": "http://moodle/course/view.php?id=1",
-                }
+                    "id": 2,
+                    "fullname": "Curso para alunos de ZL",
+                    "restricoes_de_autoinscricao": "tipo_usuario == 'Aluno' and outras_matriculas[0]['campus'] == 'ZL'",
+                },
+                {
+                    "id": 3,
+                    "fullname": "Curso para servidores",
+                    "restricoes_de_autoinscricao": "tipo_usuario == 'Servidor'",
+                },
             ],
-            "autoinscricoes": [{"id": 1, "restricoes_de_autoinscricao": "true"}],
         }
 
-    def _contexto(*args, **kwargs):
-        threads_orm.append(threading.get_ident())
-        return {}
+    with patch("painel.v1.services.get_json_api", side_effect=resposta_moodle):
+        for _ in range(3):
+            result = get_diarios(user.username, q="")
 
-    def _filter(*args, **kwargs):
-        threads_orm.append(threading.get_ident())
-        return MagicMock(first=MagicMock(return_value=None))
+            assert {(d["ambiente"]["id"], d["curso"]["codigo"], d["curso"]["nome"]) for d in result["diarios"]} == {
+                (ava.pk, cursos[ava.pk].codigo, cursos[ava.pk].nome) for ava in ambientes
+            }
+            assert {(c["ambiente"]["id"], c["id"], c["fullname"]) for c in result["autoinscricoes"]} == {
+                (ava.pk, 2, "Curso para alunos de ZL") for ava in ambientes
+            }
 
-    cache = MagicMock()
-    cache.get.return_value = None
+
+def test_get_diarios_preserva_outros_ambientes_apos_resposta_invalida(usuario_com_diarios):
+    from painel.v1.services import get_diarios
+
+    user, ambientes, cursos = usuario_com_diarios
+    ambiente_com_falha = ambientes[0]
+
+    def resposta_moodle(ambiente, servico, **params):
+        diarios = [{"id": 1, "fullname": "Diário", "curso_codigo": cursos[ambiente.pk].codigo}]
+        if ambiente.pk == ambiente_com_falha.pk:
+            diarios.append(None)
+        return {"diarios": diarios}
+
     with (
-        patch("painel.v1.services.Ambiente.cached", return_value=[_ambiente_teste()]),
-        patch("painel.v1.services.Ambiente.as_dict", return_value=[]),
-        patch("painel.v1.services.get_json_api", side_effect=_get_json_api),
-        patch("painel.v1.services.get_user_context", side_effect=_contexto),
-        patch("painel.v1.services.Curso.objects") as curso_objects,
-        patch("painel.v1.services.cache", cache),
-        patch("painel.v1.services.connections") as connections,
+        patch("painel.v1.services.get_json_api", side_effect=resposta_moodle),
+        patch("painel.v1.services.sentry_sdk.capture_exception"),
     ):
-        curso_objects.filter.side_effect = _filter
-        resultado = get_diarios("123")
+        for _ in range(3):
+            result = get_diarios(user.username, q="")
 
-    assert len(resultado["diarios"]) == 1
-    assert len(resultado["autoinscricoes"]) == 1
-    assert threads_http
-    assert principal not in threads_http, "a consulta ao Moodle deve rodar em thread auxiliar"
-    assert threads_orm and set(threads_orm) == {principal}, "ORM só pode rodar na thread da requisição"
-    connections.close_all.assert_called()
+            assert {(d["ambiente"]["id"], d["curso"]["codigo"], d["curso"]["nome"]) for d in result["diarios"]} == {
+                (ava.pk, cursos[ava.pk].codigo, cursos[ava.pk].nome) for ava in ambientes[1:]
+            }
 
 
 @pytest.mark.django_db
@@ -593,3 +625,59 @@ def test_set_user_preference_grava_settings_no_perfil(client):
 
     assert response.status_code == 200
     assert Perfil.objects.get(user=user).settings == {"accessibility": {"dyslexia_friendly": True}}
+
+
+@pytest.mark.django_db
+def test_get_diarios_nao_usa_orm_nas_threads_do_pool():
+    """Chamado #561508: ORM em thread do ThreadPoolExecutor abre uma conexão por thread que nunca é fechada."""
+    import threading
+
+    from painel.v1.services import get_diarios
+
+    get_user_model().objects.create_user(username="123")
+    principal = threading.get_ident()
+    threads_orm = []
+    threads_http = []
+
+    def _get_json_api(*args, **kwargs):
+        threads_http.append(threading.get_ident())
+        return {
+            "diarios": [
+                {
+                    "shortname": "x",
+                    "curso_codigo": "123",
+                    "diario_id": 1,
+                    "viewurl": "http://moodle/course/view.php?id=1",
+                }
+            ],
+            "autoinscricoes": [{"id": 1, "restricoes_de_autoinscricao": "true"}],
+        }
+
+    def _contexto(*args, **kwargs):
+        threads_orm.append(threading.get_ident())
+        return {}
+
+    def _filter(*args, **kwargs):
+        threads_orm.append(threading.get_ident())
+        return MagicMock(first=MagicMock(return_value=None))
+
+    cache = MagicMock()
+    cache.get.return_value = None
+    with (
+        patch("painel.v1.services.Ambiente.cached", return_value=[_ambiente_teste()]),
+        patch("painel.v1.services.Ambiente.as_dict", return_value=[]),
+        patch("painel.v1.services.get_json_api", side_effect=_get_json_api),
+        patch("painel.v1.services.get_user_context", side_effect=_contexto),
+        patch("painel.v1.services.Curso.objects") as curso_objects,
+        patch("painel.v1.services.cache", cache),
+        patch("painel.v1.services.connections") as connections,
+    ):
+        curso_objects.filter.side_effect = _filter
+        resultado = get_diarios("123")
+
+    assert len(resultado["diarios"]) == 1
+    assert len(resultado["autoinscricoes"]) == 1
+    assert threads_http
+    assert principal not in threads_http, "a consulta ao Moodle deve rodar em thread auxiliar"
+    assert threads_orm and set(threads_orm) == {principal}, "ORM só pode rodar na thread da requisição"
+    connections.close_all.assert_called()

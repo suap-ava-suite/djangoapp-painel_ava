@@ -53,3 +53,61 @@
         }
     }
 }
+
+/* Popup cadastrado no admin (painel.Popup) */
+#popup-admin {
+    &.popup-admin-overlay {
+        position: fixed;
+        inset: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    }
+
+    &.hidden {
+        display: none;
+    }
+
+    .popup-admin-content {
+        background: var(--general-white);
+        padding: 1.25rem;
+        border-radius: 1rem;
+        width: min(90vw, 480px);
+        max-height: 85vh;
+        overflow-y: auto;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    #popup-admin-title {
+        font: var(--font-heading3);
+    }
+
+    .popup-admin-message {
+        font: var(--font-paragraph2);
+        margin-top: 0.5rem;
+    }
+
+    .popup-modal-buttons {
+        margin-top: 1rem;
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+    }
+
+    .popup-btn-confirm,
+    .popup-btn-cancel {
+        padding: 0.25rem 1rem;
+        border: none;
+        border-radius: 30px;
+        cursor: pointer;
+        font: var(--font-button3);
+        background-color: var(--secondary);
+        color: var(--general-white);
+        transition: all 0.2s ease-out;
+        &:hover {
+            background-color: var(--secondary-dark);
+        }
+    }
+}

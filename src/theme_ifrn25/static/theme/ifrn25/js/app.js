@@ -1,5 +1,11 @@
 import * as VueSelect from './vue-select.js';
 
+// Registra o erro no console e o envia ao Sentry (no-op sem SENTRY_JS_DSN).
+const reportJsError = (mensagem, error) => {
+    console.error(mensagem, error);
+    window.sentryReport?.(error, { mensagem });
+};
+
 const getSalasIniciais = () => {
     const nomesAdmin = window.PAGE_CONFIG?.nomesAbas || {};
     const salas = {};
@@ -300,7 +306,7 @@ const app = Vue.createApp({
                 );
                 app.classList.toggle('menu-bottom', this.isBottom);
             } catch (err) {
-                console.error('Não foi possível salvar a posição:', err);
+                reportJsError('Não foi possível salvar a posição:', err);
             }
         },
         getCsrfToken() {
@@ -517,7 +523,7 @@ const app = Vue.createApp({
                 this.handleFilterResponse(data);
                 this.loadProgress();
             } catch (error) {
-                console.error("Error fetching data:", error);
+                reportJsError("Error fetching data:", error);
                 this.diarios = [];
             } finally {
                 if (exibirLoading) {
@@ -592,14 +598,14 @@ const app = Vue.createApp({
                 const res = await fetch(`/api/v1/progresso/?${params.toString()}`);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
-                
+
                 if (data.progresso && data.progresso.length > 0) {
                     this.updateProgressInCards(data.progresso);
                 } else {
-                    this.updateProgressInCards([]); 
+                    this.updateProgressInCards([]);
                 }
             } catch (error) {
-                console.error("Error fetching progress:", error);
+                reportJsError("Error fetching progress:", error);
                 this.updateProgressInCards([]);
             }
         },
@@ -650,7 +656,7 @@ const app = Vue.createApp({
                         ...parsedFilters // Sobrescreve com os salvos
                     };
                 } catch (e) {
-                    console.error('Erro ao carregar filtros:', e);
+                    reportJsError('Erro ao carregar filtros:', e);
                 }
             }
         },
@@ -726,7 +732,7 @@ const app = Vue.createApp({
                     item.isfavourite = new_status === 1;
                 })
                 .catch(error => {
-                    console.error('Erro ao atualizar favorito:', error);
+                    reportJsError('Erro ao atualizar favorito:', error);
                 });
         },
         togglePreference(category, key, value) {
@@ -771,7 +777,7 @@ const app = Vue.createApp({
                     document.body.classList.toggle(key, value === true || value === "true");
                 })
                 .catch(error => {
-                    console.error("Erro na requisição:", error);
+                    reportJsError("Erro na requisição:", error);
                 });
         },
 
@@ -803,7 +809,7 @@ const app = Vue.createApp({
                     alert("Não foi possível realizar a inscrição. Tente novamente.");
                 }
             } catch (error) {
-                console.error('Erro:', error);
+                reportJsError('Erro:', error);
                 const message = error.response?.data?.message || "Erro de comunicação com o servidor.";
                 alert(message);
             } finally {
@@ -829,7 +835,7 @@ const app = Vue.createApp({
                     console.error('Erro na inscrição:', response.data);
                 }
             } catch (error) {
-                console.error('Erro:', error);
+                reportJsError('Erro:', error);
                 const message = error.response?.data?.message || "Erro de comunicação com o servidor.";
                 alert(message);
             } finally {
@@ -865,7 +871,7 @@ const app = Vue.createApp({
                         alert("Não foi possível cancelar a inscrição.");
                     }
                 } catch (error) {
-                    console.error('Erro:', error);
+                    reportJsError('Erro:', error);
                     const message = error.response?.data?.message || "Erro de comunicação com o servidor ao cancelar a matrícula.";
                     alert(message);
                 } finally {
@@ -995,7 +1001,7 @@ const app = Vue.createApp({
                 const data = await response.json();
                 completou_tour = data.completed_tour;
             } catch (error) {
-                console.error('Erro:', error);
+                reportJsError('Erro:', error);
             }
 
             if (completou_tour != true) {
@@ -1012,9 +1018,9 @@ const app = Vue.createApp({
                                 fetch('set_tour_completed/')
                                     .then(response => response.json())
                                     .then(data => console.log(data))
-                                    .catch(error => console.error('Erro:', error));
+                                    .catch(error => reportJsError('Erro:', error));
                             } catch (e) {
-                                console.error('Erro fechar o tour:', e);
+                                reportJsError('Erro fechar o tour:', e);
                             }
                         },
                     },
@@ -1030,7 +1036,7 @@ const app = Vue.createApp({
                                     elemento.click();
                                 }
                             } catch (e) {
-                                console.error('Erro ao clicar no elemento:', e);
+                                reportJsError('Erro ao clicar no elemento:', e);
                             }
                         }
                     },
@@ -1046,7 +1052,7 @@ const app = Vue.createApp({
                                     elemento.click();
                                 }
                             } catch (e) {
-                                console.error('Erro ao clicar no elemento:', e);
+                                reportJsError('Erro ao clicar no elemento:', e);
                             }
                         },
                         onNext: () => {
@@ -1056,7 +1062,7 @@ const app = Vue.createApp({
                                     elemento.click();
                                 }
                             } catch (e) {
-                                console.error('Erro ao clicar no elemento:', e);
+                                reportJsError('Erro ao clicar no elemento:', e);
                             }
                         },
                     },
@@ -1072,7 +1078,7 @@ const app = Vue.createApp({
                                     elemento.click();
                                 }
                             } catch (e) {
-                                console.error('Erro ao clicar no elemento:', e);
+                                reportJsError('Erro ao clicar no elemento:', e);
                             }
                         },
 
@@ -1083,7 +1089,7 @@ const app = Vue.createApp({
                                     elemento.click();
                                 }
                             } catch (e) {
-                                console.error('Erro ao clicar no elemento:', e);
+                                reportJsError('Erro ao clicar no elemento:', e);
                             }
                         }
                     },
@@ -1104,7 +1110,7 @@ const app = Vue.createApp({
                                     elemento.click();
                                 }
                             } catch (e) {
-                                console.error('Erro ao clicar no elemento:', e);
+                                reportJsError('Erro ao clicar no elemento:', e);
                             }
                         },
                         onNext: () => {
@@ -1114,7 +1120,7 @@ const app = Vue.createApp({
                                     elemento.click();
                                 }
                             } catch (e) {
-                                console.error('Erro ao clicar no elemento:', e);
+                                reportJsError('Erro ao clicar no elemento:', e);
                             }
                         }
                     },
@@ -1130,7 +1136,7 @@ const app = Vue.createApp({
                                     elemento.click();
                                 }
                             } catch (e) {
-                                console.error('Erro ao clicar no elemento:', e);
+                                reportJsError('Erro ao clicar no elemento:', e);
                             }
                         },
                         onNext: () => {
@@ -1139,13 +1145,13 @@ const app = Vue.createApp({
                                 fetch('set_tour_completed/')
                                     .then(response => response.json())
                                     .then(data => console.log(data))
-                                    .catch(error => console.error('Erro:', error));
+                                    .catch(error => reportJsError('Erro:', error));
                                 const elemento = document.getElementById('btn-toggle-profile');
                                 if (elemento && elemento.classList.contains('active')) {
                                     elemento.click();
                                 }
                             } catch (e) {
-                                console.error('Erro ao clicar no elemento:', e);
+                                reportJsError('Erro ao clicar no elemento:', e);
                             }
                         },
                     },
@@ -1170,7 +1176,7 @@ const app = Vue.createApp({
                     wt.setSteps(steps);
                     wt.start();
                 } catch (e) {
-                    console.error('Erro ao adicionar passos do tour:', e);
+                    reportJsError('Erro ao adicionar passos do tour:', e);
                 }
             }
         }

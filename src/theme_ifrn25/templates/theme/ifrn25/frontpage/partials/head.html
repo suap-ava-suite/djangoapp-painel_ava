@@ -44,6 +44,13 @@
     <link rel="stylesheet" href="{% static 'theme/ifrn25/css/modals/popup-modal.css' %}?last_startup={{ last_startup }}">
     <link rel="stylesheet" href="{% static 'theme/ifrn25/css/modals/accessibility.css' %}?last_startup={{ last_startup }}">
 
+    <!-- Sentry (JavaScript): só carrega com SENTRY_JS_DSN -->
+    {% if sentry_js %}
+        {{ sentry_js|json_script:"sentry-js-config" }}
+        <script src="https://browser.sentry-cdn.com/8.55.0/bundle.min.js" integrity="sha384-BlRl+vkcjdIA/AKRb8zWtiqlVVXepUsSv0+vho7ZMUTsNudEyQjGUKo9W86Hc1EC" crossorigin="anonymous"></script>
+    {% endif %}
+    <script src="{% static 'theme/ifrn25/js/sentry-init.js' %}?last_startup={{ last_startup }}"></script>
+
     <!-- Vue.js -->
     <script src="https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.js"></script>
     <script type="module" src="{% static 'theme/ifrn25/js/vue-select.js' %}?last_startup={{ last_startup }}"></script>

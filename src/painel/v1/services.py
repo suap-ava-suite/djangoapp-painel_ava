@@ -101,6 +101,23 @@ def get_user_context(usuario_db) -> dict:
     return last_json
 
 
+# Campos do contexto que podem ir para logs e Sentry: nada que identifique a pessoa (CPF, e-mails, nascimento...)
+CAMPOS_CONTEXTO_SEGUROS = ("tipo_usuario", "campus")
+CAMPOS_MATRICULA_SEGUROS = ("tipo", "campus", "modalidade", "nivel_ensino", "ativo")
+
+
+def contexto_para_log(contexto: Union[dict, None]) -> dict:
+    """Resumo do contexto do usuário sem dados pessoais, para diagnóstico em logs e no Sentry."""
+    contexto = contexto or {}
+    resumo = {campo: contexto.get(campo) for campo in CAMPOS_CONTEXTO_SEGUROS}
+    resumo["outras_matriculas"] = [
+        {campo: m.get(campo) for campo in CAMPOS_MATRICULA_SEGUROS}
+        for m in contexto.get("outras_matriculas") or []
+        if isinstance(m, dict)
+    ]
+    return resumo
+
+
 def check_autoinscricao(regra: str, usuario_db, contexto: Union[dict, None] = None) -> bool:
     if not regra or not str(regra).strip() or not usuario_db:
         return False
@@ -117,16 +134,19 @@ def check_autoinscricao(regra: str, usuario_db, contexto: Union[dict, None] = No
         resultado = rule.matches(contexto)
         username = getattr(usuario_db, "username", "unknown")
         sucesso = "PASSOU" if resultado else "FOI BLOQUEADO"
-        logger.debug(f'Usuário {username} {sucesso} na regra "{regra}". Contexto: {contexto}')
+        logger.debug(f'Usuário {username} {sucesso} na regra "{regra}". Contexto: {contexto_para_log(contexto)}')
         return resultado
     except Exception as e:
         username = getattr(usuario_db, "username", "unknown")
         # Mensagem fixa e fingerprint único: todos os eventos caem numa só issue do Sentry
-        logger.warning(f'Erro ao avaliar para {username} a regra "{regra}". Erro: {e}. Contexto: {contexto}')
+        logger.warning(
+            f'Erro ao avaliar para {username} a regra "{regra}". Erro: {e}. Contexto: {contexto_para_log(contexto)}'
+        )
         with sentry_sdk.new_scope() as scope:
             scope.fingerprint = ["autoinscricao-regra-nao-avaliada"]
             scope.set_context(
-                "autoinscricao", {"username": username, "regra": regra, "erro": str(e), "contexto": contexto}
+                "autoinscricao",
+                {"username": username, "regra": regra, "erro": str(e), "contexto": contexto_para_log(contexto)},
             )
             sentry_sdk.capture_message(MENSAGEM_REGRA_NAO_AVALIADA, level="info")
         return False

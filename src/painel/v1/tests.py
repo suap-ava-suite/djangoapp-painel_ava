@@ -712,3 +712,60 @@ def test_get_json_api_loga_tempo_na_falha():
         assert get_json_api(_ambiente_teste(), "get_progresso", username="x") is None
 
     assert any("falha HTTP 500" in c.args[0] for c in log.info.call_args_list)
+
+
+CONTEXTO_COM_DADOS_PESSOAIS = {
+    "cpf": "000.000.000-00",
+    "email": "fulano@exemplo.test",
+    "email_secundario": "fulano@exemplo.org",
+    "data_de_nascimento": "1990-01-02",
+    "passaporte": "XX000000",
+    "foto": "https://exemplo.test/foto.jpg",
+    "nome": "Fulano de Tal",
+    "tipo_usuario": "Aluno",
+    "campus": "ZL",
+    "outras_matriculas": [
+        {
+            "identificador": "20251ZL0000001",
+            "tipo": "aluno",
+            "campus": "ZL",
+            "modalidade": "Técnico subsequente",
+            "nivel_ensino": "Médio",
+            "ativo": True,
+        }
+    ],
+}
+DADOS_PESSOAIS = ("000.000.000-00", "fulano@exemplo", "1990-01-02", "XX000000", "foto.jpg", "Fulano", "20251ZL0000001")
+
+
+@pytest.mark.django_db
+def test_check_autoinscricao_nao_loga_dados_pessoais_no_debug():
+    """#104: o log da regra traz só o resumo do contexto, sem CPF, e-mails, nascimento etc."""
+    from painel.v1.services import check_autoinscricao
+
+    user = get_user_model().objects.create_user(username="123")
+    with patch("painel.v1.services.logger") as log:
+        assert check_autoinscricao("tipo_usuario in ['Aluno']", user, CONTEXTO_COM_DADOS_PESSOAIS) is True
+
+    mensagem = log.debug.call_args.args[0]
+    assert "Aluno" in mensagem and "Técnico subsequente" in mensagem
+    assert not any(dado in mensagem for dado in DADOS_PESSOAIS)
+
+
+@pytest.mark.django_db
+def test_check_autoinscricao_erro_nao_envia_dados_pessoais_ao_log_nem_ao_sentry():
+    from painel.v1.services import check_autoinscricao
+
+    user = get_user_model().objects.create_user(username="123")
+    scope = MagicMock()
+    with (
+        patch("painel.v1.services.sentry_sdk.capture_message"),
+        patch("painel.v1.services.sentry_sdk.new_scope") as new_scope,
+        patch("painel.v1.services.logger") as log,
+    ):
+        new_scope.return_value.__enter__.return_value = scope
+        assert check_autoinscricao("chave_inexistente == 'x'", user, CONTEXTO_COM_DADOS_PESSOAIS) is False
+
+    enviado = str(scope.set_context.call_args) + log.warning.call_args.args[0]
+    assert "Aluno" in enviado
+    assert not any(dado in enviado for dado in DADOS_PESSOAIS)

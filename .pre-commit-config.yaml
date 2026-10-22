@@ -70,7 +70,7 @@ repos:
     - id: pytest-coverage-gate
       name: pytest-coverage-gate
       stages: [pre-push]
-      entry: ava test integrador pytest --cov=. --cov-report=xml:coverage.xml --cov-report=term-missing
+      entry: sas test painel
       language: system
       pass_filenames: false
       always_run: true

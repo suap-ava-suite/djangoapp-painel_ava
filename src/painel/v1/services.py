@@ -14,6 +14,7 @@ import sentry_sdk
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.db import connections
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 
@@ -320,9 +321,29 @@ def get_diarios(
 
         return {**diario, **ambiente}
 
-    def _get_diarios(params: Dict[str, Any]):
+    def _buscar_diarios(params: Dict[str, Any]) -> dict:
+        """Roda nas threads do pool: somente HTTP ao Moodle. Sem ORM, para não abrir conexão com o banco por thread."""
         logger.debug(f"Consultando API do Moodle para o ambiente {params['ambiente'].nome} com os parâmetros: {params}")
 
+        try:
+            querystrings = {
+                k: v for k, v in params.items() if k not in ["ambiente", "results"] and str(v).strip() != ""
+            }
+
+            if querystrings.get("q") is not None:
+                querystrings["q"] = urllib.parse.quote(querystrings["q"])
+
+            return get_json_api(params["ambiente"], "get_diarios", **querystrings) or {}
+        except Exception as e:
+            logging.error(e)
+            sentry_sdk.capture_exception(e)
+            return {}
+        finally:
+            # Rede de segurança: nunca deixar conexão aberta numa thread auxiliar
+            connections.close_all()
+
+    def _mesclar_diarios(params: Dict[str, Any], result: dict):
+        """Roda na thread da requisição: pode usar o ORM (curso e vínculos do usuário)."""
         try:
             ambiente = params["ambiente"]
             ambientedict = {
@@ -332,15 +353,6 @@ def get_diarios(
                     "cor_mestra": ambiente.cor_mestra,
                 }
             }
-
-            querystrings = {
-                k: v for k, v in params.items() if k not in ["ambiente", "results"] and str(v).strip() != ""
-            }
-
-            if "q" in querystrings:
-                querystrings["q"] = urllib.parse.quote(querystrings["q"])
-
-            result = get_json_api(ambiente, "get_diarios", **querystrings) or {}
 
             usuario_db_param = params.get("usuario_db")
             result["autoinscricoes"] = _filtrar_autoinscricoes(result.get("autoinscricoes", []), usuario_db_param)
@@ -411,7 +423,10 @@ def get_diarios(
     ]
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        executor.map(_get_diarios, requests)
+        respostas = list(executor.map(_buscar_diarios, requests))
+
+    for params, resposta in zip(requests, respostas):
+        _mesclar_diarios(params, resposta)
 
     results["semestres"] = [{"id": "", "label": "Semestres... "}] + deduplicate_and_sort(
         results["semestres"], reverse=True
@@ -537,6 +552,9 @@ def get_progresso(username: str, ambiente: str = None, cursos: str = None) -> di
                     params["results"].extend(data)
         except Exception as e:
             logger.error(f"Erro em get_progresso ({ava.nome}): {e}")
+        finally:
+            # Rede de segurança: nunca deixar conexão aberta numa thread auxiliar
+            connections.close_all()
 
     requests_args = [
         {

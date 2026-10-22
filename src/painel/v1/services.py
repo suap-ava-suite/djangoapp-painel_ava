@@ -181,21 +181,43 @@ def get_json(url, headers={}, encoding="utf-8", json_kwargs=None, **kwargs):
     return json.loads(content, **(json_kwargs or {}))
 
 
+def _resumir_quantidades(data: Any) -> str:
+    """Quantidade de itens retornados: total para lista, por chave (listas) para dict."""
+    if isinstance(data, list):
+        return str(len(data))
+    if isinstance(data, dict):
+        return ", ".join(f"{k}={len(v)}" for k, v in data.items() if isinstance(v, list)) or "0"
+    return "0"
+
+
+def _log_chamada_moodle(ava: Ambiente, service: str, inicio: float, resultado: str, quantidade: str = "-") -> None:
+    """Tempo e quantidade por chamada ao Moodle, para achar qual ambiente está lento."""
+    logger.info(
+        f"Moodle '{ava.nome}' {service}: {resultado} em {(time.monotonic() - inicio) * 1000:.0f} ms, "
+        f"quantidade: {quantidade}"
+    )
+
+
 def get_json_api(ava: Ambiente, service: str, **params: dict):
     if params is not None:
         querystring = "&".join([f"{k}={v}" for k, v in params.items() if v is not None])
     else:
         querystring = ""
     url = f"{ava.moodle_base_api_url}/?{service}&{querystring}"
+    inicio = time.monotonic()
     try:
-        return get_json(url, headers={"Authentication": f"Token {ava.token}"})
+        data = get_json(url, headers={"Authentication": f"Token {ava.token}"})
+        _log_chamada_moodle(ava, service, inicio, "ok", _resumir_quantidades(data))
+        return data
     except HTTPException as e:
         if _usuario_nao_encontrado(e):
-            logger.info(f"Moodle '{ava.nome}': usuário não encontrado em {service}")
+            _log_chamada_moodle(ava, service, inicio, "usuário não encontrado")
             return None
+        _log_chamada_moodle(ava, service, inicio, f"falha HTTP {getattr(e, 'status', '?')}")
         _registrar_falha_moodle(ava, service, url, e)
         return None
     except (requests.exceptions.RequestException, ValueError) as e:
+        _log_chamada_moodle(ava, service, inicio, f"falha {type(e).__name__}")
         _registrar_falha_moodle(ava, service, url, e)
         return None
 

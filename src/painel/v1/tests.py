@@ -681,3 +681,34 @@ def test_get_diarios_nao_usa_orm_nas_threads_do_pool():
     assert principal not in threads_http, "a consulta ao Moodle deve rodar em thread auxiliar"
     assert threads_orm and set(threads_orm) == {principal}, "ORM só pode rodar na thread da requisição"
     connections.close_all.assert_called()
+
+
+@pytest.mark.django_db
+def test_get_json_api_loga_tempo_e_quantidade_retornada():
+    """#102: cada chamada ao Moodle loga ambiente, serviço, tempo e quantidade por chave."""
+    from painel.v1.services import get_json_api
+
+    corpo = '{"diarios": [1, 2, 3], "coordenacoes": [], "semestres": "x"}'
+    with (
+        patch("painel.v1.services.requests.get", return_value=_resposta(200, corpo)),
+        patch("painel.v1.services.logger") as log,
+    ):
+        assert get_json_api(_ambiente_teste(), "get_diarios", username="x")["diarios"] == [1, 2, 3]
+
+    mensagem = log.info.call_args.args[0]
+    assert "Moodle de Teste" in mensagem and "get_diarios" in mensagem
+    assert "ok em" in mensagem and "ms" in mensagem
+    assert "diarios=3, coordenacoes=0" in mensagem
+
+
+@pytest.mark.django_db
+def test_get_json_api_loga_tempo_na_falha():
+    from painel.v1.services import get_json_api
+
+    with (
+        patch("painel.v1.services.requests.get", return_value=_resposta(500, "erro", "Server Error")),
+        patch("painel.v1.services.logger") as log,
+    ):
+        assert get_json_api(_ambiente_teste(), "get_progresso", username="x") is None
+
+    assert any("falha HTTP 500" in c.args[0] for c in log.info.call_args_list)

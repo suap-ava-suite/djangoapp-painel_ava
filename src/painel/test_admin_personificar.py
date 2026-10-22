@@ -39,3 +39,32 @@ def test_staff_sem_superusuario_nao_ve_personificar(db):
     staff.user_permissions.add(Permission.objects.get(codename="view_user"))
     html = _cliente(staff).get("/admin/auth/user/").content.decode()
     assert "impersonate" not in html
+
+
+def _render_voltar_a_ser(template, user):
+    from django.template.loader import render_to_string
+
+    ctx = {"user": user, "logged_user": user, "personificando": True, "admins": [], "ambientes": []}
+    return render_to_string(template, ctx)
+
+
+@pytest.mark.parametrize(
+    "template",
+    [
+        "theme/ifrn25/frontpage/partials/modals/profile.html",
+        "theme/ifrn23/layouts/partials/header-1-user.html",
+    ],
+)
+def test_voltar_a_ser_mostra_o_nome_de_quem_personifica(usuarios, template):
+    admin, _, _ = usuarios
+    from django_suap_auth.profile.models import Perfil
+
+    Perfil.objects.create(user=admin, nome_usual="Kelson Medeiros")
+    admin.refresh_from_db()
+    assert "Voltar a ser Kelson Medeiros" in _render_voltar_a_ser(template, admin)
+
+
+def test_voltar_a_ser_sem_perfil_usa_username(usuarios):
+    admin, _, _ = usuarios
+    html = _render_voltar_a_ser("theme/ifrn25/frontpage/partials/modals/profile.html", admin)
+    assert "Voltar a ser" in html and "admin" in html

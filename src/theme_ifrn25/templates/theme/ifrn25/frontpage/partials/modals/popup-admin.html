@@ -1,0 +1,18 @@
+{% if popup %}
+    <div id="popup-admin"
+         class="popup-modal-overlay popup-admin-overlay hidden"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="popup-admin-title"
+         data-popup-id="{{ popup.id }}"
+         data-popup-url="{{ popup.url }}">
+        <div class="popup-modal-content popup-admin-content">
+            <h2 id="popup-admin-title">{{ popup.titulo }}</h2>
+            <div class="popup-admin-message">{{ popup.mensagem|safe }}</div>
+            <div class="popup-modal-buttons">
+                <button type="button" id="popup-admin-later" class="popup-btn-cancel">Lembre-me depois</button>
+                <button type="button" id="popup-admin-access" class="popup-btn-confirm">Acessar agora</button>
+            </div>
+        </div>
+    </div>
+{% endif %}

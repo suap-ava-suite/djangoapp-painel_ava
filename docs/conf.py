@@ -4,7 +4,7 @@
 project = "Painel AVA"
 copyright = "2026, IFRN - DEAD"
 author = "IFRN - DEAD"
-release = "1.1.057"
+release = "1.1.058"
 
 # -- General configuration ---------------------------------------------------
 extensions = [

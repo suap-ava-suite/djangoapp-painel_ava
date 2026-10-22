@@ -82,5 +82,6 @@ User = get_user_model()
 try:
     admin.site.unregister(User)
 except admin.sites.NotRegistered:
+    # Nada a desregistrar: o admin padrão de User ainda não foi registrado
     pass
 admin.site.register(User, PersonificarUserAdmin)

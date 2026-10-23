@@ -2,9 +2,9 @@
 from sc4py.env import env, env_as_bool, env_as_list
 
 SECRET_KEY = env("DJANGO_SECRET_KEY", "#warning: changeme")
-LOGIN_URL = env("DJANGO_LOGIN_URL", "/auth/suap/login/")
+LOGIN_URL = env("DJANGO_LOGIN_URL", "/login/")
 LOGIN_REDIRECT_URL = env("DJANGO_LOGIN_REDIRECT_URL", "/")
-LOGOUT_REDIRECT_URL = env("DJANGO_LOGOUT_REDIRECT_URL", "/auth/suap/logout/")
+LOGOUT_REDIRECT_URL = env("DJANGO_LOGOUT_REDIRECT_URL", "/logout/")
 AUTH_USER_MODEL = env("DJANGO_AUTH_USER_MODEL", "auth.User")
 AUTHENTICATION_BACKENDS = env_as_list(
     "AUTHENTICATION_BACKENDS",

@@ -107,3 +107,21 @@ independente de ``SENTRY_DNS`` (Django), então pode apontar para outro projeto 
 - ``SENTRY_RELEASE``: release (padrão: versão da aplicação).
 
 Erros originados em arquivos da pasta ``vendors`` são descartados.
+
+Falhas de rede e CSRF
+~~~~~~~~~~~~~~~~~~~~~
+
+O helper ``erros-rede.js`` classifica falhas de ``fetch``/``axios`` pela causa provável e a envia como tag
+``causa_falha`` (com ``online``, ``visibilidade``, ``tipo_conexao``, ``rtt`` e ``http_status`` nos extras). Valores:
+``offline``, ``timeout``, ``http_403``, ``http_5xx``, ``http``, ``desconhecida``, ``outro``, ``navegando`` e
+``aba_oculta``. Os dois últimos (usuário saindo da página, aba em segundo plano) não são enviados ao Sentry.
+
+O usuário vê um aviso com a orientação adequada (por exemplo, recarregar a página em caso de 403 de CSRF) e, no
+progresso dos diários, o botão "Tentar novamente". O carregamento do progresso tem timeout de 15 s e uma nova tentativa.
+
+Testes do JavaScript (Node.js ≥ 20, sem dependências extras)::
+
+    node --test src/painel/tests_js/erros-rede.test.js
+
+O pytest também executa essa suíte (``painel/test_erros_rede_js.py``); ela é ignorada quando o Node.js não está
+instalado.

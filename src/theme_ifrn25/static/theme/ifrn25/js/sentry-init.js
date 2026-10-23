@@ -35,11 +35,18 @@
     });
 
     // Registra no Sentry um erro tratado (ex.: em um catch), com contexto extra.
+    // `context.tags` vira tags do evento; `context.descartar` impede o envio
+    // (falhas que não indicam defeito, como o usuário navegando para outra página).
     window.sentryReport = function (error, context) {
+        const { tags, descartar, ...extras } = context || {};
+        if (descartar) {
+            return;
+        }
         try {
             window.Sentry.withScope((scope) => {
-                if (context) {
-                    scope.setExtras(context);
+                scope.setExtras(extras);
+                if (tags) {
+                    scope.setTags(tags);
                 }
                 const resp = error && error.response;
                 if (resp) {

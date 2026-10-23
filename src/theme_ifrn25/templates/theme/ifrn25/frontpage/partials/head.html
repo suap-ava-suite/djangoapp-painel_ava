@@ -49,6 +49,11 @@
         {{ sentry_js|json_script:"sentry-js-config" }}
         <script src="https://browser.sentry-cdn.com/8.55.0/bundle.min.js" integrity="sha384-BlRl+vkcjdIA/AKRb8zWtiqlVVXepUsSv0+vho7ZMUTsNudEyQjGUKo9W86Hc1EC" crossorigin="anonymous"></script>
     {% endif %}
+    <!-- Analytics (GA4 + Clarity) do ifrn25: só carrega com IFRN25_GTAG_CODE / IFRN25_CLARITY_CODE -->
+    {% if ifrn25_analytics %}
+        {{ ifrn25_analytics|json_script:"analytics-config" }}
+    {% endif %}
+    <script src="{% static 'theme/ifrn25/js/analytics.js' %}?last_startup={{ last_startup }}"></script>
     <script src="{% static 'theme/ifrn25/js/sentry-init.js' %}?last_startup={{ last_startup }}"></script>
     <script src="{% static 'theme/ifrn25/js/erros-rede.js' %}?last_startup={{ last_startup }}"></script>
 

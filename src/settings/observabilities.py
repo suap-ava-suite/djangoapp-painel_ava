@@ -7,6 +7,14 @@ if env("GTAG_CODE") is not None:
 if env("CLARITY_CODE") is not None:
     CLARITY_CODE = env("CLARITY_CODE")  # noqa
 
+# Analytics do theme_ifrn25: chaves próprias, independentes de GTAG_CODE/CLARITY_CODE (theme_ifrn23).
+# Sem nenhuma das duas, o front-end não carrega GA/Clarity e `window.track()` é um no-op.
+if env("IFRN25_GTAG_CODE") is not None or env("IFRN25_CLARITY_CODE") is not None:
+    IFRN25_ANALYTICS = dict(  # noqa
+        gtag=env("IFRN25_GTAG_CODE"),
+        clarity=env("IFRN25_CLARITY_CODE"),
+    )
+
 if env("SENTRY_DNS") is not None:
     import logging
 

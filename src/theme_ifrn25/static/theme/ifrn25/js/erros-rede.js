@@ -123,6 +123,7 @@
     // Aviso discreto (não bloqueante) com botão opcional "Tentar novamente".
     function mostrarAviso(texto, { aoTentarNovamente, doc = raiz.document } = {}) {
         if (!doc) return null;
+        raiz.track?.('aviso_modal_exibir');
         doc.getElementById('aviso-rede')?.remove();
 
         const caixa = doc.createElement('div');
@@ -165,7 +166,8 @@
     // Diálogo modal (substitui o `alert` nativo, que bloqueia a página e não tem design).
     // Usa o markup de `modals/aviso-modal.html`; sem ele, recorre ao `alert`.
     // Fecha com o botão, Esc ou clique fora. Devolve uma Promise resolvida ao fechar.
-    function mostrarDialogo({ titulo = 'Não foi possível concluir', mensagem = '', codigo, doc = raiz.document, navegador = raiz.navigator } = {}) {
+    function mostrarDialogo({ titulo = 'Não foi possível concluir', mensagem = '', codigo, causa, doc = raiz.document, navegador = raiz.navigator } = {}) {
+        raiz.track?.('erro_rede_dialogo_exibir', { causa: causa || 'desconhecida' });
         const modal = doc?.getElementById('aviso-modal');
         if (!modal) {
             raiz.alert?.(comCodigo(mensagem, codigo));

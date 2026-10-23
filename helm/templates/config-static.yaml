@@ -72,8 +72,12 @@ data:
   # ======================
   # Analytics
   # ======================
-  GTAG_CODE: "G-DL5BKHKYBY"
-  CLARITY_CODE: "pn9h14ln9l"
+  # Chart usado só em test: IDs de test, nunca os de produção (ficam nos docker compose).
+  GTAG_CODE: "G-WDCE91LF43"
+  CLARITY_CODE: "z2fnsnwnpc"
+  # theme_ifrn25: Clarity próprio; o GA4 de test é compartilhado ("tema" distingue)
+  IFRN25_GTAG_CODE: "G-WDCE91LF43"
+  IFRN25_CLARITY_CODE: "z2foibmpaw"
 
   # ======================
   # Redis / Valkey

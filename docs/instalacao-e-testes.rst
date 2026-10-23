@@ -108,6 +108,49 @@ independente de ``SENTRY_DNS`` (Django), então pode apontar para outro projeto 
 
 Erros originados em arquivos da pasta ``vendors`` são descartados.
 
+Google Analytics e Clarity (theme_ifrn25)
+-----------------------------------------
+
+O tema ``ifrn25`` carrega GA4 e Microsoft Clarity com chaves **próprias**, independentes de
+``GTAG_CODE`` e ``CLARITY_CODE`` (usadas pelo ``ifrn23``). Sem a variável, o serviço não é carregado.
+
+- ``IFRN25_GTAG_CODE``: ID do GA4 (``G-XXXXXXX``).
+- ``IFRN25_CLARITY_CODE``: ID do projeto Clarity.
+
+O GA4 pode ser o mesmo ID do ``ifrn23``: o ifrn25 envia a propriedade de usuário ``tema=ifrn25`` (e a tag
+``tema`` no Clarity) para separar os relatórios. Para filtrar por ela no GA4, registre ``tema`` como
+dimensão personalizada de escopo de usuário.
+
+``window.track(evento, params)`` (``theme_ifrn25/static/theme/ifrn25/js/analytics.js``) envia o evento
+aos dois serviços; é no-op quando nenhum está carregado. Erros de JavaScript não tratados
+(``error`` e ``unhandledrejection``) geram o evento ``js_error`` e as tags ``js_error`` e
+``js_error_msg`` (mensagem cortada em 100 caracteres) no Clarity; erros tratados em ``reportJsError``
+geram ``js_error_tratado``. Nunca envie dados pessoais nos eventos. O plano completo de eventos
+está na issue #115.
+
+Eventos instrumentados (issue #117), sempre com categorias e IDs de curso/ambiente, nunca com nome,
+matrícula ou texto de busca:
+
+- Navegação: ``sidebar_toggle``, ``modal_abrir``, ``aba_selecionar``, ``menu_posicao_alterar``.
+- Cursos: ``curso_abrir``, ``curso_detalhes_ver``, ``curso_favoritar``, ``curso_visibilidade_alterar``,
+  ``curso_visibilidade_confirmar``, ``progresso_carregar_falha``.
+- Filtros: ``filtro_aplicar``, ``filtro_limpar``, ``filtro_remover``, ``busca_sem_resultado``,
+  ``carregamento_lento``.
+- Matrícula: ``matricula_iniciar``, ``matricula_sucesso``, ``matricula_falha``,
+  ``matricula_cancelar_confirmar``, ``matricula_cancelar_sucesso``.
+- Acessibilidade: ``a11y_preferencia_alterar``, ``a11y_zoom_alterar``, ``a11y_contraste_alterar``.
+- Links: ``ajuda_link_clicar``, ``perfil_link_clicar``, ``tema_trocar``, ``ambiente_acessar``, ``logout``.
+- Tour e avisos: ``tour_iniciar``, ``tour_passo``, ``tour_concluir``, ``popup_exibir``, ``popup_fechar``,
+  ``aviso_modal_exibir``, ``erro_rede_dialogo_exibir``.
+
+O evento ``tour_abandonar`` não existe: a biblioteca do tour (WebTour) só expõe ``onNext`` e ``onPrevious``,
+sem callback de fechamento.
+
+Para marcar um link ou botão sem JavaScript, use ``data-track="evento"``; cada ``data-track-xxx="valor"``
+vira o parâmetro ``xxx`` (``data-track-id_ambiente`` vira ``id_ambiente``). Em templates do Vue, use
+``track('evento', { chave: valor })``. As propriedades de sessão (``color_mode``, ``zoom_level``,
+``menu_position``, ``vlibras_ativo``, ``app_version``) são enviadas ao GA (user properties) e ao Clarity (tags).
+
 CSRF atrás de proxy
 ~~~~~~~~~~~~~~~~~~~
 

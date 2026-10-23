@@ -1,6 +1,7 @@
 {% extends "theme/ifrn25/frontpage/index.html" %}
 
 {% block content %}
+    <script>window.track?.('curso_detalhes_ver', { id_ambiente: '{{ id_ambiente }}', id_curso: '{{ id_curso }}' });</script>
     <div id="content-container" :class="{'expanded': sidebarContracted}">
 
         <div class="content">
@@ -109,7 +110,8 @@
                             {% if request.user.is_authenticated %}
 
                                 {% if is_enrolled %}
-                                    <a href="{{ moodle_url }}/course/view.php?id={{ id_curso }}" class="btn btn-primary btn-lg text-nowrap">
+                                    <a href="{{ moodle_url }}/course/view.php?id={{ id_curso }}" class="btn btn-primary btn-lg text-nowrap"
+                                       data-track="curso_abrir" data-track-origem="detalhes">
                                         <i class="fa-solid fa-laptop-code"></i> Acessar Curso
                                     </a>
                                 {% else %}

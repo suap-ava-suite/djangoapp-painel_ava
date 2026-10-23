@@ -78,8 +78,8 @@
     </div>
 
     <button v-if="loading" disabled="true" class="modal-content-body-filter-button"
-            @click="filterCards()">Carregando</button>
-    <button v-if="!loading" class="modal-content-body-filter-button" @click="filterCards()">Filtrar</button>
+            @click="aplicarFiltros()">Carregando</button>
+    <button v-if="!loading" class="modal-content-body-filter-button" @click="aplicarFiltros()">Filtrar</button>
     <button class="modal-content-body-filter-clear" @click="resetFilters()">
         <i class="fa-solid fa-trash-can"></i>
         <span>Limpar filtros</span>

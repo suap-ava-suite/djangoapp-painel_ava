@@ -2,17 +2,17 @@
     <div class="ava-button-options">
         <span class="modal-content-body-title">Links</span>
         <div class="modal-button-option">
-            <a href="https://suap.ifrn.edu.br/comum/minha_conta/">Perfil no SUAP</a>
+            <a href="https://suap.ifrn.edu.br/comum/minha_conta/" data-track="perfil_link_clicar" data-track-destino="suap">Perfil no SUAP</a>
         </div>
         <div class="modal-button-option">
-            <a href="https://aberto.ava.ifrn.edu.br">AVA Aberto</a>
+            <a href="https://aberto.ava.ifrn.edu.br" data-track="perfil_link_clicar" data-track-destino="ava_aberto">AVA Aberto</a>
         </div>
     </div>
     <div class="ava-button-options">
         <span class="modal-content-body-title">Tema</span>
         {% for activeTheme in active_themes %}
             <div class="modal-button-option">
-                <a {% if user.theme_selected != activeTheme.nome %} href="{% url "painel:change_theme" theme=activeTheme.nome %}" class="dropdown-item"{% else %} class="dropdown-item selected"{% endif %}>
+                <a {% if user.theme_selected != activeTheme.nome %} href="{% url "painel:change_theme" theme=activeTheme.nome %}" class="dropdown-item" data-track="tema_trocar" data-track-tema="{{ activeTheme.nome }}"{% else %} class="dropdown-item selected"{% endif %}>
                     {% if user.theme_selected == activeTheme.nome %}<i class="fa fa-check me-2"></i>{% endif %}{{activeTheme.apelido}}
                 </a>
             </div>
@@ -31,16 +31,16 @@
                 {% if admins %}
                     {% for ava in admins %}
                         <div class="modal-button-option">
-                            <a class="dropdown-item" href="{{ ava.url }}">{{ ava.nome }}</a>
+                            <a class="dropdown-item" href="{{ ava.url }}" data-track="ambiente_acessar" data-track-id_ambiente="{{ ava.pk }}">{{ ava.nome }}</a>
                         </div>
                     {% endfor %}
                 {% else %}
                     <div class="modal-button-option">
-                        <a class="dropdown-item" href="{% url 'admin:painel_contrante_changelist' %}">Cadastrar ambiente</a>
+                        <a class="dropdown-item" href="{% url 'admin:painel_contrante_changelist' %}" data-track="perfil_link_clicar" data-track-destino="cadastrar_ambiente">Cadastrar ambiente</a>
                     </div>
                 {% endif %}
                 <div class="modal-button-option">
-                    <a class="dropdown-item" href="{% url 'admin:index' %}">Painel AVA</a>
+                    <a class="dropdown-item" href="{% url 'admin:index' %}" data-track="perfil_link_clicar" data-track-destino="admin">Painel AVA</a>
                 </div>
             </div>
         {% endif %}
@@ -61,6 +61,6 @@
         </div>
     </div>
     <div class="modal-button-option exit-button">
-        <a href="{% url 'suap_auth:logout' %}">Sair</a>
+        <a href="{% url 'suap_auth:logout' %}" data-track="logout">Sair</a>
     </div>
 </div>

@@ -27,7 +27,7 @@
 
 <div class="card-container" v-if="!loading && {{ list_name }}.length > 0">
     <div class="card" v-for="(item, index) in {{ list_name }}" :key="index">
-        <a class="text-decoration-none" :href="goToCourseUrl(item)" v-on:click="mostrarGauge">
+        <a class="text-decoration-none" :href="goToCourseUrl(item)" v-on:click="mostrarGauge($event); track('curso_abrir', { origem: 'card' })">
             <h2 class="painel-card-title">[[ item.fullname ]]</h2>
             <span class="painel-card-header-shortname">[[ item.shortname ]]</span>
         </a>
@@ -44,9 +44,9 @@
                 </div>
                 <span>[[ item.progress ]]% concluído</span>
             </div>
-            <!-- <div class="painel-card-details-progress" 
-                v-else-if="item.can_set_visibility && filters.situacao === 'inprogress'" 
-                title="Configure o acompanhamento de conclusão no Moodle para exibir a barra de progresso" 
+            <!-- <div class="painel-card-details-progress"
+                v-else-if="item.can_set_visibility && filters.situacao === 'inprogress'"
+                title="Configure o acompanhamento de conclusão no Moodle para exibir a barra de progresso"
                 style="cursor: help;">
                 <i class="fa-solid fa-triangle-exclamation text-warning" style="font-size: 14px;"></i>
                 <span class="text-warning" style="color: #856404 !important; font-weight: 500;">

@@ -27,7 +27,7 @@
 
 <div class="card-container" v-if="!loading && {{ list_name }}.length > 0">
     <div class="card" v-for="(item, index) in {{ list_name }}" :key="index">
-        <a class="text-decoration-none painel-card-header" :href="item.details_url" v-on:click="mostrarGauge">
+        <a class="text-decoration-none painel-card-header" :href="item.details_url" v-on:click="mostrarGauge($event); track('curso_abrir', { origem: 'autoinscricao_detalhes' })">
             <h2 class="painel-card-title">[[ item.fullname ]]</h2>
             <span class="painel-card-header-shortname">[[ item.shortname ]]</span>
         </a>
@@ -42,7 +42,7 @@
                 <template v-else>
                     <a class="btn btn-primary"
                        style="flex: 1; display: flex; justify-content: center; align-items: center; gap: 5px;"
-                       :href="item.url" @click="mostrarGauge">
+                       :href="item.url" @click="mostrarGauge($event); track('curso_abrir', { origem: 'autoinscricao' })">
                         Acessar curso
                     </a>
 

@@ -18,6 +18,11 @@ def popup(request: HttpRequest) -> Dict[str, Popup]:
     return {"popup": Popup.activePopup()}
 
 
+def ifrn25_analytics() -> dict | None:
+    config = getattr(settings, "IFRN25_ANALYTICS", None)
+    return {**config, "app_version": settings.APP_VERSION} if config else None
+
+
 def layout_settings(request: HttpRequest) -> dict:
     return {
         "logged_user": get_active_user(request),
@@ -31,7 +36,7 @@ def layout_settings(request: HttpRequest) -> dict:
         "gtag": settings.GTAG_CODE if hasattr(settings, "GTAG_CODE") else False,
         "clarity": settings.CLARITY_CODE if hasattr(settings, "CLARITY_CODE") else False,
         "sentry_js": getattr(settings, "SENTRY_JS", None),
-        "ifrn25_analytics": getattr(settings, "IFRN25_ANALYTICS", None),
+        "ifrn25_analytics": ifrn25_analytics(),
         "ambientes": Ambiente.cached(),
         "admins": Ambiente.admins(),
         "installed_themes": get_installed_themes(),

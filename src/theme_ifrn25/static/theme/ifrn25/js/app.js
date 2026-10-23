@@ -269,6 +269,10 @@ const app = Vue.createApp({
         this.sidebarContracted = this.isMobile();
     },
     methods: {
+        // Os templates do Vue não enxergam `window`; este método repassa o evento ao analytics.
+        track(evento, params) {
+            window.track?.(evento, params);
+        },
         getPreferences() {
             if (document.body.classList.contains('dyslexia_friendly')) {
                 this.preferences.dyslexia_friendly = true;
@@ -317,6 +321,8 @@ const app = Vue.createApp({
                     { headers: { 'X-CSRFToken': this.getCsrfToken() } }
                 );
                 app.classList.toggle('menu-bottom', this.isBottom);
+                this.track('menu_posicao_alterar', { posicao: pos });
+                window.trackPropriedades?.({ menu_position: pos });
             } catch (err) {
                 reportJsError('Não foi possível salvar a posição:', err);
             }
@@ -411,6 +417,7 @@ const app = Vue.createApp({
                     this.modalTitle = this.getModalTitle(type);
                     this.modalHeaderIcon = this.modalHeaderIcons[type];
                     this.modalOpen = true;
+                    this.track('modal_abrir', { tipo: type });
                 }, 200);
                 return;
             }
@@ -418,6 +425,7 @@ const app = Vue.createApp({
             this.modalTitle = this.getModalTitle(type);
             this.modalHeaderIcon = this.modalHeaderIcons[type];
             this.modalOpen = true;
+            this.track('modal_abrir', { tipo: type });
 
         },
         getModalTitle(type) {
@@ -479,6 +487,7 @@ const app = Vue.createApp({
                 this.closeSidebarModal();
             }
             this.sidebarContracted = !this.sidebarContracted
+            this.track('sidebar_toggle', { estado: this.sidebarContracted ? 'contraida' : 'aberta' });
         },
         closeSidebar() {
             this.sidebarContracted = true;
@@ -495,6 +504,7 @@ const app = Vue.createApp({
         },
         setActiveTab(key) {
             this.activeTabKey = key;
+            this.track('aba_selecionar', { aba: key });
         },
         getNumberCourses(categoryKey) {
             const category = this.salasPorCategoria[categoryKey];
@@ -503,7 +513,18 @@ const app = Vue.createApp({
             }
             return 0;
         },
-        async filterCards(exibirLoading = true) {
+        // Só vale como "aplicar filtro": `aplicarFiltros()` é o botão Filtrar do modal.
+        aplicarFiltros() {
+            const usados = Object.keys(this.filters).filter((k) => k !== 'query' && this.filters[k]);
+            this.track('filtro_aplicar', {
+                filtros: usados.join(','),
+                situacao: this.filters.situacao || '',
+                query_preenchida: Boolean(this.filters.query),
+            });
+            this.filterCards(true, 'aplicar');
+        },
+        // `origem` só é informado quando a pessoa disparou a busca (não no carregamento inicial).
+        async filterCards(exibirLoading = true, origem = null) {
             // Modal fecha ao fazer busca no mobile
             if (this.isMobile()) {
                 this.closeSidebarModal();
@@ -515,6 +536,7 @@ const app = Vue.createApp({
                 if (this.loadingTimeoutId) clearTimeout(this.loadingTimeoutId);
                 this.loadingTimeoutId = setTimeout(() => {
                     this.isTakingLong = true;
+                    this.track('carregamento_lento', { segundos: 8 });
                 }, 8000);
             }
 
@@ -533,6 +555,12 @@ const app = Vue.createApp({
                 const data = await res.json();
 
                 this.handleFilterResponse(data);
+                if (origem) {
+                    const total = Object.values(this.salasPorCategoria).reduce((n, cards) => n + cards.length, 0);
+                    if (total === 0) {
+                        this.track('busca_sem_resultado', { origem, qtd_filtros: Object.values(this.filters).filter(Boolean).length });
+                    }
+                }
                 this.loadProgress();
             } catch (error) {
                 reportJsError("Error fetching data:", error);
@@ -599,7 +627,8 @@ const app = Vue.createApp({
         removeFilter(filterType) {
             if (filterType === 'situacao') return; // Impede remoção do filtro padrão
             this.filters[filterType] = null;
-            this.filterCards();
+            this.track('filtro_remover', { tipo: filterType });
+            this.filterCards(true, 'remover');
         },
         async loadProgress() {
             try {
@@ -617,6 +646,7 @@ const app = Vue.createApp({
                 }
             } catch (error) {
                 const falha = reportJsError("Error fetching progress:", error);
+                this.track('progresso_carregar_falha', { causa: falha?.causa || 'desconhecida' });
                 // Só encerra o indicador de carregamento; não apaga progresso já exibido.
                 this.finalizarCarregamentoProgresso();
                 if (falha.causa !== 'navegando' && falha.causa !== 'aba_oculta') {
@@ -666,7 +696,8 @@ const app = Vue.createApp({
                 ambiente: null
             };
             this.saveFilters();
-            this.filterCards();
+            this.track('filtro_limpar');
+            this.filterCards(true, 'limpar');
         },
         saveFilters() {
             localStorage.setItem('filters', JSON.stringify(this.filters));
@@ -719,6 +750,7 @@ const app = Vue.createApp({
             const action = card.visible ? "ocultar" : "publicar";
 
             this.showConfirmation(action, (confirmed) => {
+                this.track('curso_visibilidade_confirmar', { acao: action, confirmado: Boolean(confirmed) });
                 if (confirmed) {
                     const new_status = card.visible ? '0' : '1';
                     axios
@@ -731,6 +763,7 @@ const app = Vue.createApp({
                         })
                         .then((response) => {
                             card.visible = new_status == 1;
+                            this.track('curso_visibilidade_alterar', { acao: action });
                         })
                         .catch((error) => {
                             console.debug(error);
@@ -755,6 +788,7 @@ const app = Vue.createApp({
                 })
                 .then(data => {
                     item.isfavourite = new_status === 1;
+                    this.track('curso_favoritar', { acao: new_status === 1 ? 'favoritar' : 'desfavoritar' });
                 })
                 .catch(error => {
                     reportJsError('Erro ao atualizar favorito:', error);
@@ -783,6 +817,8 @@ const app = Vue.createApp({
                     // Atualiza a UI conforme a preferência
                     if (key === "zoom_level") {
                         document.body.setAttribute("data-zoom", value);
+                        this.track('a11y_zoom_alterar', { nivel: String(value) });
+                        window.trackPropriedades?.({ zoom_level: String(value) });
                         return;
                     }
 
@@ -796,10 +832,16 @@ const app = Vue.createApp({
 
                         // adiciona o selecionado
                         document.body.classList.add(`color_mode_${value}`);
+                        this.track('a11y_contraste_alterar', { modo: String(value) });
+                        window.trackPropriedades?.({ color_mode: String(value) });
                         return;
                     }
 
                     document.body.classList.toggle(key, value === true || value === "true");
+                    this.track('a11y_preferencia_alterar', { chave: key, valor: value === true || value === "true" });
+                    if (key === "vlibras_active") {
+                        window.trackPropriedades?.({ vlibras_ativo: value === true || value === "true" });
+                    }
                 })
                 .catch(error => {
                     reportJsError("Erro na requisição:", error);
@@ -811,6 +853,7 @@ const app = Vue.createApp({
             if (this.loading) return;
 
             this.loading = true;
+            this.track('matricula_iniciar', { origem: 'card' });
 
             const idAmbiente = item.ambiente_id;
             const idCurso = item.id;
@@ -825,18 +868,21 @@ const app = Vue.createApp({
 
                 if (response.data.status === 'enrolled' || response.data.status === 'reactivated') {
                     item.is_enrolled = true;
+                    this.track('matricula_sucesso', { origem: 'card', status: response.data.status });
                     this.filterCards(false);
 
                     // Opcional: Se quiser forçar o redirecionamento, descomente a linha abaixo
                     // window.location.href = `/course/view.php?id=${idCurso}`;
                 } else {
                     console.error('Erro na inscrição:', response.data);
-                    window.ErrosRede.mostrarDialogo({ mensagem: "Não foi possível realizar a inscrição. Tente novamente." });
+                    this.track('matricula_falha', { origem: 'card', causa: 'resposta_inesperada' });
+                    window.ErrosRede.mostrarDialogo({ mensagem: "Não foi possível realizar a inscrição. Tente novamente.", causa: 'resposta_inesperada' });
                 }
             } catch (error) {
                 const falha = reportJsError('Erro:', error);
+                this.track('matricula_falha', { origem: 'card', causa: falha?.causa || 'desconhecida' });
                 const message = error.response?.data?.message || falha?.mensagem || "Erro de comunicação com o servidor.";
-                window.ErrosRede.mostrarDialogo({ mensagem: message, codigo: falha.eventId });
+                window.ErrosRede.mostrarDialogo({ mensagem: message, codigo: falha.eventId, causa: falha?.causa });
             } finally {
                 this.loading = false;
             }
@@ -844,6 +890,7 @@ const app = Vue.createApp({
         async enrollFromDetails(idAmbiente, idCurso, moodleUrl) {
 
             this.loading = true;
+            this.track('matricula_iniciar', { origem: 'detalhes' });
             const url = `/curso/${idAmbiente}/${idCurso}/enrol/`;
 
             try {
@@ -855,14 +902,17 @@ const app = Vue.createApp({
 
                 if (response.data.status === 'enrolled' || response.data.status === 'reactivated') {
                     // Após inscrição, redireciona para o curso no Moodle
+                    this.track('matricula_sucesso', { origem: 'detalhes', status: response.data.status });
                     window.location.href = `${moodleUrl}/course/view.php?id=${idCurso}`;
                 } else {
                     console.error('Erro na inscrição:', response.data);
+                    this.track('matricula_falha', { origem: 'detalhes', causa: 'resposta_inesperada' });
                 }
             } catch (error) {
                 const falha = reportJsError('Erro:', error);
+                this.track('matricula_falha', { origem: 'detalhes', causa: falha?.causa || 'desconhecida' });
                 const message = error.response?.data?.message || falha?.mensagem || "Erro de comunicação com o servidor.";
-                window.ErrosRede.mostrarDialogo({ mensagem: message, codigo: falha.eventId });
+                window.ErrosRede.mostrarDialogo({ mensagem: message, codigo: falha.eventId, causa: falha?.causa });
             } finally {
                 this.loading = false;
             }
@@ -871,6 +921,7 @@ const app = Vue.createApp({
             // Chamamos o showConfirmation passando a ação 'cancelar',
             // o callback assíncrono e o nome do curso como contexto extra.
             this.showConfirmation('cancelar', async (confirmed) => {
+                this.track('matricula_cancelar_confirmar', { confirmado: Boolean(confirmed) });
                 if (!confirmed) return;
 
                 if (this.loading) return;
@@ -890,6 +941,7 @@ const app = Vue.createApp({
 
                     if (response.data.status === 'unenrolled' || response.status === 200) {
                         item.is_enrolled = false;
+                        this.track('matricula_cancelar_sucesso');
                         this.filterCards(false);
                     } else {
                         console.error('Erro no cancelamento:', response.data);
@@ -898,7 +950,7 @@ const app = Vue.createApp({
                 } catch (error) {
                     const falha = reportJsError('Erro:', error);
                     const message = error.response?.data?.message || falha?.mensagem || "Erro de comunicação com o servidor ao cancelar a matrícula.";
-                    window.ErrosRede.mostrarDialogo({ mensagem: message, codigo: falha.eventId });
+                    window.ErrosRede.mostrarDialogo({ mensagem: message, codigo: falha.eventId, causa: falha?.causa });
                 } finally {
                     this.loading = false;
                 }
@@ -1196,10 +1248,20 @@ const app = Vue.createApp({
                         placement: "bottom-end",
                     });
                 }
+                // Acompanha o avanço: o WebTour só expõe onNext/onPrevious (sem callback de fechamento).
+                const total = steps.length;
+                steps.forEach((passo, i) => {
+                    const original = passo.onNext;
+                    passo.onNext = () => {
+                        this.track(i === total - 1 ? 'tour_concluir' : 'tour_passo', { passo: i + 1, total });
+                        return original ? original() : null;
+                    };
+                });
                 try {
                     const wt = new WebTour();
                     wt.setSteps(steps);
                     wt.start();
+                    this.track('tour_iniciar', { total });
                 } catch (e) {
                     reportJsError('Erro ao adicionar passos do tour:', e);
                 }

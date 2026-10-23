@@ -57,3 +57,45 @@ test('trackErroJs marca o Clarity e corta a mensagem em 100 caracteres', () => {
 test('cortar trata nulo', () => {
     assert.equal(cortar(null), '');
 });
+
+test('paramsDoElemento converte data-track-* em parâmetros snake_case', () => {
+    const { paramsDoElemento } = require(path.join(JS_DIR, 'analytics.js'));
+    const el = { dataset: { track: 'x', trackDestino: 'suap', trackId_ambiente: '7', outro: 'ignorado' } };
+    assert.deepEqual(paramsDoElemento(el), { destino: 'suap', id_ambiente: '7' });
+    assert.deepEqual(paramsDoElemento({ dataset: { trackIdAmbiente: '3' } }), { id_ambiente: '3' });
+});
+
+test('lerPropriedades lê só preferências da página', () => {
+    const { lerPropriedades } = require(path.join(JS_DIR, 'analytics.js'));
+    const attrs = { 'data-zoom': '120' };
+    const doc = {
+        body: {
+            classList: ['vlibras_active', 'color_mode_high_contrast', 'big_cursor'],
+            getAttribute: (n) => attrs[n] || null,
+        },
+    };
+    globalThis.INITIAL_SETTINGS = { menuPosition: 'bottom' };
+    assert.deepEqual(lerPropriedades(doc, '1.1.068'), {
+        color_mode: 'high_contrast',
+        zoom_level: '120',
+        menu_position: 'bottom',
+        vlibras_ativo: true,
+        app_version: '1.1.068',
+    });
+    delete globalThis.INITIAL_SETTINGS;
+});
+
+test('trackPropriedades envia ao GA e ao Clarity', () => {
+    const { trackPropriedades } = require(path.join(JS_DIR, 'analytics.js'));
+    limpar();
+    const chamadas = [];
+    globalThis.gtag = (...a) => chamadas.push(['gtag', ...a]);
+    globalThis.clarity = (...a) => chamadas.push(['clarity', ...a]);
+    trackPropriedades({ zoom_level: '150', vlibras_ativo: false });
+    assert.deepEqual(chamadas, [
+        ['gtag', 'set', 'user_properties', { zoom_level: '150', vlibras_ativo: false }],
+        ['clarity', 'set', 'zoom_level', '150'],
+        ['clarity', 'set', 'vlibras_ativo', 'false'],
+    ]);
+    limpar();
+});

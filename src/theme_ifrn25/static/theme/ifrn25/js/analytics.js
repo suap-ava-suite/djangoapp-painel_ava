@@ -70,6 +70,56 @@
         }
     };
 
+    // Propriedades de sessão (só categorias, nunca dados pessoais): user properties no GA e tags no Clarity.
+    const trackPropriedades = (props) => {
+        try {
+            if (typeof raiz.gtag === 'function') {
+                raiz.gtag('set', 'user_properties', props);
+            }
+            if (typeof raiz.clarity === 'function') {
+                Object.keys(props).forEach((k) => raiz.clarity('set', k, String(props[k])));
+            }
+        } catch (e) {
+            console.error('Falha ao enviar propriedades de analytics:', e);
+        }
+    };
+
+    // Lê as preferências da página (classes e atributos do <body>) sem acessar dados da pessoa.
+    const lerPropriedades = (doc, versao) => {
+        const body = doc.body;
+        const cls = body ? Array.from(body.classList || []) : [];
+        const modo = cls.find((c) => c.indexOf('color_mode_') === 0);
+        return {
+            color_mode: modo ? modo.slice('color_mode_'.length) : 'default',
+            zoom_level: (body && body.getAttribute('data-zoom')) || '100',
+            menu_position: (raiz.INITIAL_SETTINGS && raiz.INITIAL_SETTINGS.menuPosition) || 'top',
+            vlibras_ativo: cls.indexOf('vlibras_active') !== -1,
+            app_version: versao || '',
+        };
+    };
+
+    // Cliques em elementos com `data-track="evento"`; cada `data-track-xxx="v"` vira o parâmetro `xxx`.
+    const paramsDoElemento = (el) => {
+        const params = {};
+        Object.keys(el.dataset || {}).forEach((k) => {
+            if (k.indexOf('track') === 0 && k !== 'track') {
+                const nome = k
+                    .slice(5)
+                    .replace(/^./, (c) => c.toLowerCase())
+                    .replace(/[A-Z]/g, (c) => '_' + c.toLowerCase());
+                params[nome] = el.dataset[k];
+            }
+        });
+        return params;
+    };
+
+    const aoClicar = (e) => {
+        const alvo = e.target && e.target.closest ? e.target.closest('[data-track]') : null;
+        if (alvo) {
+            track(alvo.dataset.track, paramsDoElemento(alvo));
+        }
+    };
+
     const iniciar = (w, d) => {
         const config = lerConfig(d);
         if (config.clarity) {
@@ -79,6 +129,10 @@
         if (config.gtag) {
             carregarGtag(w, d, config.gtag);
         }
+        d.addEventListener('click', aoClicar);
+        d.addEventListener('DOMContentLoaded', () => {
+            trackPropriedades(lerPropriedades(d, config.app_version));
+        });
         w.addEventListener('error', (e) => {
             trackErroJs('error', e.message || 'script error');
         });
@@ -90,11 +144,12 @@
 
     raiz.track = track;
     raiz.trackErroJs = trackErroJs;
+    raiz.trackPropriedades = trackPropriedades;
 
     if (typeof document !== 'undefined' && raiz.addEventListener) {
         iniciar(raiz, document);
     }
     if (typeof module !== 'undefined' && module.exports) {
-        module.exports = { lerConfig, track, trackErroJs, cortar };
+        module.exports = { lerConfig, track, trackErroJs, trackPropriedades, lerPropriedades, paramsDoElemento, cortar };
     }
 })(typeof window !== 'undefined' ? window : globalThis);

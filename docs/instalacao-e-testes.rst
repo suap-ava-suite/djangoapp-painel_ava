@@ -128,6 +128,29 @@ aos dois serviços; é no-op quando nenhum está carregado. Erros de JavaScript 
 geram ``js_error_tratado``. Nunca envie dados pessoais nos eventos. O plano completo de eventos
 está na issue #115.
 
+Eventos instrumentados (issue #117), sempre com categorias e IDs de curso/ambiente, nunca com nome,
+matrícula ou texto de busca:
+
+- Navegação: ``sidebar_toggle``, ``modal_abrir``, ``aba_selecionar``, ``menu_posicao_alterar``.
+- Cursos: ``curso_abrir``, ``curso_detalhes_ver``, ``curso_favoritar``, ``curso_visibilidade_alterar``,
+  ``curso_visibilidade_confirmar``, ``progresso_carregar_falha``.
+- Filtros: ``filtro_aplicar``, ``filtro_limpar``, ``filtro_remover``, ``busca_sem_resultado``,
+  ``carregamento_lento``.
+- Matrícula: ``matricula_iniciar``, ``matricula_sucesso``, ``matricula_falha``,
+  ``matricula_cancelar_confirmar``, ``matricula_cancelar_sucesso``.
+- Acessibilidade: ``a11y_preferencia_alterar``, ``a11y_zoom_alterar``, ``a11y_contraste_alterar``.
+- Links: ``ajuda_link_clicar``, ``perfil_link_clicar``, ``tema_trocar``, ``ambiente_acessar``, ``logout``.
+- Tour e avisos: ``tour_iniciar``, ``tour_passo``, ``tour_concluir``, ``popup_exibir``, ``popup_fechar``,
+  ``aviso_modal_exibir``, ``erro_rede_dialogo_exibir``.
+
+O evento ``tour_abandonar`` não existe: a biblioteca do tour (WebTour) só expõe ``onNext`` e ``onPrevious``,
+sem callback de fechamento.
+
+Para marcar um link ou botão sem JavaScript, use ``data-track="evento"``; cada ``data-track-xxx="valor"``
+vira o parâmetro ``xxx`` (``data-track-id_ambiente`` vira ``id_ambiente``). Em templates do Vue, use
+``track('evento', { chave: valor })``. As propriedades de sessão (``color_mode``, ``zoom_level``,
+``menu_position``, ``vlibras_ativo``, ``app_version``) são enviadas ao GA (user properties) e ao Clarity (tags).
+
 CSRF atrás de proxy
 ~~~~~~~~~~~~~~~~~~~
 

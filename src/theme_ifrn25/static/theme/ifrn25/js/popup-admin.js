@@ -41,10 +41,12 @@
         document.removeEventListener('keydown', aoPressionarTecla);
     };
     const lembrarDepois = () => {
+        window.track?.('popup_fechar', { acao: 'depois' });
         gravar(new Date().toISOString());
         fechar();
     };
     const acessarAgora = () => {
+        window.track?.('popup_fechar', { acao: 'acessar' });
         gravar('true');
         fechar();
         // Só abre http(s), nunca esquemas como javascript:
@@ -68,5 +70,6 @@
     document.addEventListener('keydown', aoPressionarTecla);
 
     overlay.classList.remove('hidden');
+    window.track?.('popup_exibir');
     document.getElementById('popup-admin-access').focus();
 })();

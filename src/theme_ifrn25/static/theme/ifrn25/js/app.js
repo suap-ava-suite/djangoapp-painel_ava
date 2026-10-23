@@ -14,6 +14,7 @@ const reportJsError = (mensagem, error) => {
         descartar: falha?.descartavel,
         tags: falha ? { causa_falha: falha.causa } : undefined,
     });
+    window.track?.('js_error_tratado', { causa_falha: falha?.causa || 'desconhecida' });
     return { ...falha, eventId };
 };
 

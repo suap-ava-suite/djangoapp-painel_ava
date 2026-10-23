@@ -31,6 +31,7 @@ def layout_settings(request: HttpRequest) -> dict:
         "gtag": settings.GTAG_CODE if hasattr(settings, "GTAG_CODE") else False,
         "clarity": settings.CLARITY_CODE if hasattr(settings, "CLARITY_CODE") else False,
         "sentry_js": getattr(settings, "SENTRY_JS", None),
+        "ifrn25_analytics": getattr(settings, "IFRN25_ANALYTICS", None),
         "ambientes": Ambiente.cached(),
         "admins": Ambiente.admins(),
         "installed_themes": get_installed_themes(),

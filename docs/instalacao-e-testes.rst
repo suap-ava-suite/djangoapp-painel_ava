@@ -108,6 +108,22 @@ independente de ``SENTRY_DNS`` (Django), então pode apontar para outro projeto 
 
 Erros originados em arquivos da pasta ``vendors`` são descartados.
 
+Google Analytics e Clarity (theme_ifrn25)
+-----------------------------------------
+
+O tema ``ifrn25`` carrega GA4 e Microsoft Clarity com chaves **próprias**, independentes de
+``GTAG_CODE`` e ``CLARITY_CODE`` (usadas pelo ``ifrn23``). Sem a variável, o serviço não é carregado.
+
+- ``IFRN25_GTAG_CODE``: ID do GA4 (``G-XXXXXXX``).
+- ``IFRN25_CLARITY_CODE``: ID do projeto Clarity.
+
+``window.track(evento, params)`` (``theme_ifrn25/static/theme/ifrn25/js/analytics.js``) envia o evento
+aos dois serviços; é no-op quando nenhum está carregado. Erros de JavaScript não tratados
+(``error`` e ``unhandledrejection``) geram o evento ``js_error`` e as tags ``js_error`` e
+``js_error_msg`` (mensagem cortada em 100 caracteres) no Clarity; erros tratados em ``reportJsError``
+geram ``js_error_tratado``. Nunca envie dados pessoais nos eventos. O plano completo de eventos
+está na issue #115.
+
 CSRF atrás de proxy
 ~~~~~~~~~~~~~~~~~~~
 

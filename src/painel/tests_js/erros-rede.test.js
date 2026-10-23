@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const JS_DIR = path.join(__dirname, '..', '..', 'theme_ifrn25', 'static', 'theme', 'ifrn25', 'js');
-const { classificarFalha, mensagemParaUsuario, comCodigo, buscarComRetry, mostrarAviso } = require(path.join(JS_DIR, 'erros-rede.js'));
+const { classificarFalha, mensagemParaUsuario, comCodigo, buscarComRetry, mostrarAviso, mostrarDialogo } = require(path.join(JS_DIR, 'erros-rede.js'));
 
 const ambiente = (extra = {}) => ({
     navigator: { onLine: true },
@@ -204,6 +204,110 @@ test('mostrarAviso substitui o aviso anterior', () => {
     mostrarAviso('dois', { doc });
     assert.equal(elementos[0].removido, true);
     assert.equal(elementos[1].removido, false);
+});
+
+// DOM mínimo do diálogo (aviso-modal.html), localizado por id.
+const criarDocDialogo = ({ comModal = true } = {}) => {
+    const ids = ['aviso-modal', 'aviso-modal-title', 'aviso-modal-message', 'aviso-modal-codigo',
+        'aviso-modal-codigo-valor', 'aviso-modal-copiar', 'aviso-modal-fechar'];
+    const els = {};
+    ids.forEach((id) => {
+        const classes = new Set(id === 'aviso-modal' || id === 'aviso-modal-codigo' ? ['hidden'] : []);
+        els[id] = {
+            textContent: '',
+            classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), has: (c) => classes.has(c) },
+            focus() { this.focado = true; },
+        };
+    });
+    const teclado = [];
+    const doc = {
+        activeElement: { focus() { this.restaurado = true; } },
+        getElementById: (id) => (comModal ? els[id] : null),
+        addEventListener: (ev, fn) => teclado.push([ev, fn]),
+        removeEventListener: (ev, fn) => {
+            const i = teclado.findIndex(([e, f]) => e === ev && f === fn);
+            if (i >= 0) teclado.splice(i, 1);
+        },
+    };
+    return { doc, els, teclado };
+};
+
+test('mostrarDialogo exibe título, mensagem e código e foca no botão', async () => {
+    const { doc, els } = criarDocDialogo();
+    const promessa = mostrarDialogo({ titulo: 'Ops', mensagem: 'Falhou', codigo: 'abc123', doc });
+    assert.equal(els['aviso-modal'].classList.has('hidden'), false);
+    assert.equal(els['aviso-modal-title'].textContent, 'Ops');
+    assert.equal(els['aviso-modal-message'].textContent, 'Falhou');
+    assert.equal(els['aviso-modal-codigo-valor'].textContent, 'abc123');
+    assert.equal(els['aviso-modal-codigo'].classList.has('hidden'), false);
+    assert.equal(els['aviso-modal-fechar'].focado, true);
+    els['aviso-modal-fechar'].onclick();
+    await promessa;
+    assert.equal(els['aviso-modal'].classList.has('hidden'), true);
+    assert.equal(doc.activeElement.restaurado, true);
+});
+
+test('mostrarDialogo oculta o bloco de código quando não há ID', async () => {
+    const { doc, els } = criarDocDialogo();
+    const promessa = mostrarDialogo({ mensagem: 'Falhou', doc });
+    assert.equal(els['aviso-modal-codigo'].classList.has('hidden'), true);
+    assert.equal(els['aviso-modal-title'].textContent, 'Não foi possível concluir');
+    els['aviso-modal-fechar'].onclick();
+    await promessa;
+});
+
+test('mostrarDialogo fecha com Esc e remove o listener de teclado', async () => {
+    const { doc, els, teclado } = criarDocDialogo();
+    const promessa = mostrarDialogo({ mensagem: 'x', doc });
+    assert.equal(teclado.length, 1);
+    teclado[0][1]({ key: 'Enter' });
+    assert.equal(els['aviso-modal'].classList.has('hidden'), false);
+    teclado[0][1]({ key: 'Escape' });
+    await promessa;
+    assert.equal(teclado.length, 0);
+});
+
+test('mostrarDialogo fecha ao clicar fora, mas não dentro do conteúdo', async () => {
+    const { doc, els } = criarDocDialogo();
+    const promessa = mostrarDialogo({ mensagem: 'x', doc });
+    els['aviso-modal'].onclick({ target: {} });
+    assert.equal(els['aviso-modal'].classList.has('hidden'), false);
+    els['aviso-modal'].onclick({ target: els['aviso-modal'] });
+    await promessa;
+    assert.equal(els['aviso-modal'].classList.has('hidden'), true);
+});
+
+test('mostrarDialogo copia o código para a área de transferência', async () => {
+    const { doc, els } = criarDocDialogo();
+    const copiados = [];
+    const navegador = { clipboard: { writeText: async (t) => copiados.push(t) } };
+    const promessa = mostrarDialogo({ mensagem: 'x', codigo: 'abc123', doc, navegador });
+    await els['aviso-modal-copiar'].onclick();
+    assert.deepEqual(copiados, ['abc123']);
+    assert.equal(els['aviso-modal-copiar'].textContent, 'Copiado');
+    els['aviso-modal-fechar'].onclick();
+    await promessa;
+});
+
+test('mostrarDialogo orienta a copiar manualmente se a área de transferência falhar', async () => {
+    const { doc, els } = criarDocDialogo();
+    const promessa = mostrarDialogo({ mensagem: 'x', codigo: 'abc123', doc, navegador: {} });
+    await els['aviso-modal-copiar'].onclick();
+    assert.equal(els['aviso-modal-copiar'].textContent, 'Selecione e copie');
+    els['aviso-modal-fechar'].onclick();
+    await promessa;
+});
+
+test('mostrarDialogo recorre ao alert quando o markup não existe', async () => {
+    const { doc } = criarDocDialogo({ comModal: false });
+    const alertas = [];
+    globalThis.alert = (t) => alertas.push(t);
+    try {
+        await mostrarDialogo({ mensagem: 'Falhou', codigo: 'abc123', doc });
+    } finally {
+        delete globalThis.alert;
+    }
+    assert.deepEqual(alertas, ['Falhou (Código do erro: abc123)']);
 });
 
 // sentry-init.js: sentryReport aplica tags e respeita `descartar`.

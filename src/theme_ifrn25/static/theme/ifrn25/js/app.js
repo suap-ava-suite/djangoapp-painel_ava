@@ -830,12 +830,12 @@ const app = Vue.createApp({
                     // window.location.href = `/course/view.php?id=${idCurso}`;
                 } else {
                     console.error('Erro na inscrição:', response.data);
-                    alert("Não foi possível realizar a inscrição. Tente novamente.");
+                    window.ErrosRede.mostrarDialogo({ mensagem: "Não foi possível realizar a inscrição. Tente novamente." });
                 }
             } catch (error) {
                 const falha = reportJsError('Erro:', error);
                 const message = error.response?.data?.message || falha?.mensagem || "Erro de comunicação com o servidor.";
-                alert(window.ErrosRede?.comCodigo(message, falha.eventId) ?? message);
+                window.ErrosRede.mostrarDialogo({ mensagem: message, codigo: falha.eventId });
             } finally {
                 this.loading = false;
             }
@@ -861,7 +861,7 @@ const app = Vue.createApp({
             } catch (error) {
                 const falha = reportJsError('Erro:', error);
                 const message = error.response?.data?.message || falha?.mensagem || "Erro de comunicação com o servidor.";
-                alert(window.ErrosRede?.comCodigo(message, falha.eventId) ?? message);
+                window.ErrosRede.mostrarDialogo({ mensagem: message, codigo: falha.eventId });
             } finally {
                 this.loading = false;
             }
@@ -892,12 +892,12 @@ const app = Vue.createApp({
                         this.filterCards(false);
                     } else {
                         console.error('Erro no cancelamento:', response.data);
-                        alert("Não foi possível cancelar a inscrição.");
+                        window.ErrosRede.mostrarDialogo({ mensagem: "Não foi possível cancelar a inscrição." });
                     }
                 } catch (error) {
                     const falha = reportJsError('Erro:', error);
                     const message = error.response?.data?.message || falha?.mensagem || "Erro de comunicação com o servidor ao cancelar a matrícula.";
-                    alert(window.ErrosRede?.comCodigo(message, falha.eventId) ?? message);
+                    window.ErrosRede.mostrarDialogo({ mensagem: message, codigo: falha.eventId });
                 } finally {
                     this.loading = false;
                 }

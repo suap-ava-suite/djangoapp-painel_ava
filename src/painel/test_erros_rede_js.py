@@ -24,3 +24,17 @@ def test_suite_node_dos_erros_de_rede_passa():
         timeout=120,
     )
     assert resultado.returncode == 0, resultado.stdout + resultado.stderr
+
+
+def test_foot_inclui_dialogo_de_aviso_com_todos_os_ids_usados_pelo_js():
+    html = render_to_string("theme/ifrn25/frontpage/partials/foot.html", {"last_startup": "x"})
+    for id_ in (
+        "aviso-modal",
+        "aviso-modal-title",
+        "aviso-modal-message",
+        "aviso-modal-codigo",
+        "aviso-modal-codigo-valor",
+        "aviso-modal-copiar",
+        "aviso-modal-fechar",
+    ):
+        assert f'id="{id_}"' in html

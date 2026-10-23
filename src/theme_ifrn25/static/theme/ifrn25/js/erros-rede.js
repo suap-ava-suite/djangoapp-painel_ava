@@ -162,7 +162,60 @@
         return caixa;
     }
 
-    const api = { classificarFalha, mensagemParaUsuario, comCodigo, buscarComRetry, mostrarAviso, DESCARTAVEIS };
+    // Diálogo modal (substitui o `alert` nativo, que bloqueia a página e não tem design).
+    // Usa o markup de `modals/aviso-modal.html`; sem ele, recorre ao `alert`.
+    // Fecha com o botão, Esc ou clique fora. Devolve uma Promise resolvida ao fechar.
+    function mostrarDialogo({ titulo = 'Não foi possível concluir', mensagem = '', codigo, doc = raiz.document, navegador = raiz.navigator } = {}) {
+        const modal = doc?.getElementById('aviso-modal');
+        if (!modal) {
+            raiz.alert?.(comCodigo(mensagem, codigo));
+            return Promise.resolve();
+        }
+        const el = (id) => doc.getElementById(id);
+        el('aviso-modal-title').textContent = titulo;
+        el('aviso-modal-message').textContent = mensagem;
+
+        const blocoCodigo = el('aviso-modal-codigo');
+        const copiar = el('aviso-modal-copiar');
+        if (codigo) {
+            el('aviso-modal-codigo-valor').textContent = codigo;
+            blocoCodigo.classList.remove('hidden');
+        } else {
+            blocoCodigo.classList.add('hidden');
+        }
+        copiar.textContent = 'Copiar';
+        copiar.onclick = async () => {
+            try {
+                await navegador.clipboard.writeText(codigo);
+                copiar.textContent = 'Copiado';
+            } catch (e) {
+                copiar.textContent = 'Selecione e copie';
+            }
+        };
+
+        const fechar = el('aviso-modal-fechar');
+        const anterior = doc.activeElement;
+        return new Promise((resolver) => {
+            const aoTeclar = (ev) => {
+                if (ev.key === 'Escape') encerrar();
+            };
+            const encerrar = () => {
+                modal.classList.add('hidden');
+                doc.removeEventListener('keydown', aoTeclar);
+                anterior?.focus?.();
+                resolver();
+            };
+            fechar.onclick = encerrar;
+            modal.onclick = (ev) => {
+                if (ev.target === modal) encerrar();
+            };
+            doc.addEventListener('keydown', aoTeclar);
+            modal.classList.remove('hidden');
+            fechar.focus?.();
+        });
+    }
+
+    const api = { classificarFalha, mensagemParaUsuario, comCodigo, buscarComRetry, mostrarAviso, mostrarDialogo, DESCARTAVEIS };
     raiz.ErrosRede = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

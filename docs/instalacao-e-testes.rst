@@ -108,6 +108,14 @@ independente de ``SENTRY_DNS`` (Django), então pode apontar para outro projeto 
 
 Erros originados em arquivos da pasta ``vendors`` são descartados.
 
+CSRF atrás de proxy
+~~~~~~~~~~~~~~~~~~~
+
+Em produção (HTTPS atrás de proxy) o Django só aceita o ``Origin`` do navegador se ele estiver em
+``DJANGO_CSRF_TRUSTED_ORIGINS`` (lista separada por vírgula, ex.: ``https://ava.ifrn.edu.br``). Sem isso, todo
+``POST`` falha com "Verificação CSRF falhou" (403). Também são lidas ``DJANGO_CSRF_COOKIE_DOMAIN`` e
+``DJANGO_CSRF_COOKIE_SECURE`` (padrão ``False``).
+
 Falhas de rede e CSRF
 ~~~~~~~~~~~~~~~~~~~~~
 

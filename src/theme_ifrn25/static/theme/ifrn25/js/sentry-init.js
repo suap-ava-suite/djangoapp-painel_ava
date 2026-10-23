@@ -1,7 +1,9 @@
 // Inicializa o Sentry no navegador somente se o Django expôs a configuração
 // (SENTRY_JS_DSN). Sem ela, `window.sentryReport` é um no-op.
 (function () {
-    window.sentryReport = function () {};
+    window.sentryReport = function () {
+        return undefined;
+    };
 
     const el = document.getElementById('sentry-js-config');
     if (!el || !window.Sentry) {
@@ -35,20 +37,31 @@
     });
 
     // Registra no Sentry um erro tratado (ex.: em um catch), com contexto extra.
+    // `context.tags` vira tags do evento; `context.descartar` impede o envio
+    // (falhas que não indicam defeito, como o usuário navegando para outra página).
+    // Retorna o ID do evento no Sentry (ou undefined se nada foi enviado), para
+    // mostrar ao usuário e rastrear o caso caso ele abra um chamado.
     window.sentryReport = function (error, context) {
+        const { tags, descartar, ...extras } = context || {};
+        if (descartar) {
+            return undefined;
+        }
+        let eventId;
         try {
             window.Sentry.withScope((scope) => {
-                if (context) {
-                    scope.setExtras(context);
+                scope.setExtras(extras);
+                if (tags) {
+                    scope.setTags(tags);
                 }
                 const resp = error && error.response;
                 if (resp) {
                     scope.setExtras({ http_status: resp.status, http_url: resp.config && resp.config.url });
                 }
-                window.Sentry.captureException(error);
+                eventId = window.Sentry.captureException(error);
             });
         } catch (e) {
             console.error('Falha ao enviar erro ao Sentry:', e);
         }
+        return eventId;
     };
 })();

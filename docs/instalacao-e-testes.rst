@@ -116,6 +116,9 @@ O helper ``erros-rede.js`` classifica falhas de ``fetch``/``axios`` pela causa p
 ``offline``, ``timeout``, ``http_403``, ``http_5xx``, ``http``, ``desconhecida``, ``outro``, ``navegando`` e
 ``aba_oculta``. Os dois últimos (usuário saindo da página, aba em segundo plano) não são enviados ao Sentry.
 
+Quando o erro é enviado, a mensagem ao usuário inclui o **código do erro** (ID do evento no Sentry, 32 caracteres);
+se ele abrir um chamado, basta buscar esse ID no Sentry (``id:<código>``) para localizar o caso individual.
+
 O usuário vê um aviso com a orientação adequada (por exemplo, recarregar a página em caso de 403 de CSRF) e, no
 progresso dos diários, o botão "Tentar novamente". O carregamento do progresso tem timeout de 15 s e uma nova tentativa.
 

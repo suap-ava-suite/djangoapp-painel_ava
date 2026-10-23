@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 const JS_DIR = path.join(__dirname, '..', '..', 'theme_ifrn25', 'static', 'theme', 'ifrn25', 'js');
-const { classificarFalha, mensagemParaUsuario, buscarComRetry, mostrarAviso } = require(path.join(JS_DIR, 'erros-rede.js'));
+const { classificarFalha, mensagemParaUsuario, comCodigo, buscarComRetry, mostrarAviso } = require(path.join(JS_DIR, 'erros-rede.js'));
 
 const ambiente = (extra = {}) => ({
     navigator: { onLine: true },
@@ -227,6 +227,7 @@ const carregarSentryInit = () => {
             },
             captureException(e) {
                 capturados.push(e);
+                return 'f546d77d179c499ea0b9c0a1d2e3f405';
             },
         },
     };
@@ -246,10 +247,30 @@ test('sentryReport envia com tags e extras', () => {
     assert.equal('tags' in escopo.extras, false);
 });
 
-test('sentryReport não envia quando descartar', () => {
+test('sentryReport devolve o ID do evento para exibir ao usuário', () => {
+    const { window } = carregarSentryInit();
+    assert.equal(window.sentryReport(new Error('x'), {}), 'f546d77d179c499ea0b9c0a1d2e3f405');
+});
+
+test('sentryReport não envia quando descartar e não devolve ID', () => {
     const { window, capturados } = carregarSentryInit();
-    window.sentryReport(new Error('x'), { descartar: true });
+    assert.equal(window.sentryReport(new Error('x'), { descartar: true }), undefined);
     assert.equal(capturados.length, 0);
+});
+
+test('comCodigo acrescenta o código do evento à mensagem', () => {
+    assert.equal(comCodigo('Falhou.', 'abc123'), 'Falhou. (Código do erro: abc123)');
+});
+
+test('comCodigo mantém a mensagem sem ID de evento', () => {
+    assert.equal(comCodigo('Falhou.', undefined), 'Falhou.');
+});
+
+test('mostrarAviso deixa o texto selecionável para copiar o código', () => {
+    const { doc } = criarDoc();
+    const caixa = mostrarAviso(comCodigo('Falhou.', 'abc123'), { doc });
+    assert.equal(caixa.children[0].style.userSelect, 'all');
+    assert.match(caixa.children[0].textContent, /abc123/);
 });
 
 test('sentryReport anexa status e url de erro axios', () => {

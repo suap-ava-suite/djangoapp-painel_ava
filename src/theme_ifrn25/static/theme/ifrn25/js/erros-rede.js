@@ -89,6 +89,11 @@
         return MENSAGENS[causa] || MENSAGENS.rede;
     }
 
+    // Acrescenta o código do evento (ID do Sentry) à mensagem, quando existir.
+    function comCodigo(texto, eventId) {
+        return eventId ? `${texto} (Código do erro: ${eventId})` : texto;
+    }
+
     // `fetch` com timeout e novas tentativas só para falhas de transporte e 5xx.
     // Erros HTTP definitivos (4xx) não são repetidos. Lança erro com `.status` quando !ok.
     async function buscarComRetry(url, { tentativas = 2, timeoutMs = 15000, esperaMs = 800, fetchFn } = {}) {
@@ -130,6 +135,7 @@
             'box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;gap:.75rem;align-items:center;font-size:.9rem;';
 
         const span = doc.createElement('span');
+        span.style.userSelect = 'all';
         span.textContent = texto;
         caixa.appendChild(span);
 
@@ -156,7 +162,7 @@
         return caixa;
     }
 
-    const api = { classificarFalha, mensagemParaUsuario, buscarComRetry, mostrarAviso, DESCARTAVEIS };
+    const api = { classificarFalha, mensagemParaUsuario, comCodigo, buscarComRetry, mostrarAviso, DESCARTAVEIS };
     raiz.ErrosRede = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

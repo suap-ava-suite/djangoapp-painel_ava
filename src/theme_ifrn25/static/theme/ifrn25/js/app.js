@@ -3,17 +3,18 @@ import * as VueSelect from './vue-select.js';
 // Registra o erro no console e o envia ao Sentry (no-op sem SENTRY_JS_DSN),
 // etiquetado com a causa provável. Falhas que não são defeito nosso (usuário
 // navegando, aba em segundo plano) são classificadas, mas não enviadas.
-// Retorna a classificação ({ causa, mensagem, ... }) para uso na interface.
+// Retorna a classificação ({ causa, mensagem, eventId, ... }) para uso na interface;
+// `eventId` é o código do evento no Sentry, a ser mostrado ao usuário.
 const reportJsError = (mensagem, error) => {
     console.error(mensagem, error);
     const falha = window.ErrosRede?.classificarFalha(error);
-    window.sentryReport?.(error, {
+    const eventId = window.sentryReport?.(error, {
         mensagem,
         ...falha?.detalhes,
         descartar: falha?.descartavel,
         tags: falha ? { causa_falha: falha.causa } : undefined,
     });
-    return falha;
+    return { ...falha, eventId };
 };
 
 const getSalasIniciais = () => {
@@ -617,8 +618,9 @@ const app = Vue.createApp({
                 const falha = reportJsError("Error fetching progress:", error);
                 // Só encerra o indicador de carregamento; não apaga progresso já exibido.
                 this.finalizarCarregamentoProgresso();
-                if (falha && falha.causa !== 'navegando' && falha.causa !== 'aba_oculta') {
-                    window.ErrosRede.mostrarAviso(`Não foi possível carregar o progresso. ${falha.mensagem}`, {
+                if (falha.causa !== 'navegando' && falha.causa !== 'aba_oculta') {
+                    const texto = `Não foi possível carregar o progresso. ${falha.mensagem}`;
+                    window.ErrosRede.mostrarAviso(window.ErrosRede.comCodigo(texto, falha.eventId), {
                         aoTentarNovamente: () => this.loadProgress(),
                     });
                 }
@@ -833,7 +835,7 @@ const app = Vue.createApp({
             } catch (error) {
                 const falha = reportJsError('Erro:', error);
                 const message = error.response?.data?.message || falha?.mensagem || "Erro de comunicação com o servidor.";
-                alert(message);
+                alert(window.ErrosRede?.comCodigo(message, falha.eventId) ?? message);
             } finally {
                 this.loading = false;
             }
@@ -859,7 +861,7 @@ const app = Vue.createApp({
             } catch (error) {
                 const falha = reportJsError('Erro:', error);
                 const message = error.response?.data?.message || falha?.mensagem || "Erro de comunicação com o servidor.";
-                alert(message);
+                alert(window.ErrosRede?.comCodigo(message, falha.eventId) ?? message);
             } finally {
                 this.loading = false;
             }
@@ -895,7 +897,7 @@ const app = Vue.createApp({
                 } catch (error) {
                     const falha = reportJsError('Erro:', error);
                     const message = error.response?.data?.message || falha?.mensagem || "Erro de comunicação com o servidor ao cancelar a matrícula.";
-                    alert(message);
+                    alert(window.ErrosRede?.comCodigo(message, falha.eventId) ?? message);
                 } finally {
                     this.loading = false;
                 }

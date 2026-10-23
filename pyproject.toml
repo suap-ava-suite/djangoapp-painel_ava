@@ -1,6 +1,6 @@
 [project]
 name = "painel-ava"
-version = "1.1.063"
+version = "1.1.064"
 description = "Painel do AVA: portal do IFRN que reúne os diários e cursos do usuário nos ambientes Moodle."
 readme = "README.md"
 license = { file = "LICENSE.md" }

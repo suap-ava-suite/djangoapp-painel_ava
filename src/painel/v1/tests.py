@@ -475,18 +475,54 @@ def test_check_autoinscricao_usa_dados_brutos_e_vinculos_do_usuario():
 
 
 @pytest.mark.django_db
-def test_check_autoinscricao_erro_na_regra_vai_para_uma_issue_unica_nivel_info():
-    """#86: falha ao avaliar a regra não é erro; agrupa num fingerprint fixo e loga em warning."""
-    from painel.v1.services import MENSAGEM_REGRA_NAO_AVALIADA, check_autoinscricao
+def test_check_autoinscricao_erro_na_regra_nao_gera_evento_no_sentry():
+    """#116: falha ao avaliar a regra não é erro; só loga em warning e não envia nada ao Sentry."""
+    from painel.v1.services import check_autoinscricao
 
     user = get_user_model().objects.create_user(username="123")
 
-    with patch("painel.v1.services.sentry_sdk.capture_message") as capture, patch("painel.v1.services.logger") as log:
+    with (
+        patch("sentry_sdk.capture_message") as capture_message,
+        patch("sentry_sdk.capture_exception") as capture_exception,
+        patch("painel.v1.services.logger") as log,
+    ):
         assert check_autoinscricao("chave_inexistente == 'x'", user) is False
 
-    capture.assert_called_once_with(MENSAGEM_REGRA_NAO_AVALIADA, level="info")
+    capture_message.assert_not_called()
+    capture_exception.assert_not_called()
     log.warning.assert_called_once()
     log.error.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_check_autoinscricao_erro_na_regra_nao_vira_evento_pelo_logging_integration():
+    """#116: o warning não atinge o event_level=ERROR do LoggingIntegration."""
+    import logging
+
+    import sentry_sdk
+    from sentry_sdk.integrations.logging import LoggingIntegration
+    from sentry_sdk.transport import Transport
+
+    from painel.v1.services import check_autoinscricao
+
+    eventos = []
+
+    class TransporteColetor(Transport):
+        def capture_envelope(self, envelope):
+            eventos.append(envelope)
+
+    user = get_user_model().objects.create_user(username="123")
+    client = sentry_sdk.Client(
+        dsn="http://k@localhost/1",
+        integrations=[LoggingIntegration(level=logging.INFO, event_level=logging.ERROR)],
+        transport=TransporteColetor(),
+    )
+    with sentry_sdk.new_scope() as scope:
+        scope.set_client(client)
+        assert check_autoinscricao("chave_inexistente == 'x'", user) is False
+    client.flush()
+
+    assert eventos == []
 
 
 def test_wait_db_tenta_novamente_ate_o_banco_aceitar_conexoes():
@@ -753,19 +789,13 @@ def test_check_autoinscricao_nao_loga_dados_pessoais_no_debug():
 
 
 @pytest.mark.django_db
-def test_check_autoinscricao_erro_nao_envia_dados_pessoais_ao_log_nem_ao_sentry():
+def test_check_autoinscricao_erro_nao_envia_dados_pessoais_ao_log():
     from painel.v1.services import check_autoinscricao
 
     user = get_user_model().objects.create_user(username="123")
-    scope = MagicMock()
-    with (
-        patch("painel.v1.services.sentry_sdk.capture_message"),
-        patch("painel.v1.services.sentry_sdk.new_scope") as new_scope,
-        patch("painel.v1.services.logger") as log,
-    ):
-        new_scope.return_value.__enter__.return_value = scope
+    with patch("painel.v1.services.logger") as log:
         assert check_autoinscricao("chave_inexistente == 'x'", user, CONTEXTO_COM_DADOS_PESSOAIS) is False
 
-    enviado = str(scope.set_context.call_args) + log.warning.call_args.args[0]
+    enviado = log.warning.call_args.args[0]
     assert "Aluno" in enviado
     assert not any(dado in enviado for dado in DADOS_PESSOAIS)

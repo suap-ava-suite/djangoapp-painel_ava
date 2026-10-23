@@ -23,7 +23,6 @@ from painel.models import Ambiente, Curso
 
 logger = logging.getLogger(__name__)
 
-MENSAGEM_REGRA_NAO_AVALIADA = "Regra de autoinscrição não avaliada"
 MENSAGEM_FALHA_MOODLE = "Falha de comunicação com o Moodle"
 MOODLE_USUARIO_NAO_ENCONTRADO = "Usuário não encontrado."
 
@@ -138,17 +137,10 @@ def check_autoinscricao(regra: str, usuario_db, contexto: Union[dict, None] = No
         return resultado
     except Exception as e:
         username = getattr(usuario_db, "username", "unknown")
-        # Mensagem fixa e fingerprint único: todos os eventos caem numa só issue do Sentry
+        # Só log (warning não vira evento: event_level=ERROR). Enviar ao Sentry custava ~23 mil eventos (#116)
         logger.warning(
             f'Erro ao avaliar para {username} a regra "{regra}". Erro: {e}. Contexto: {contexto_para_log(contexto)}'
         )
-        with sentry_sdk.new_scope() as scope:
-            scope.fingerprint = ["autoinscricao-regra-nao-avaliada"]
-            scope.set_context(
-                "autoinscricao",
-                {"username": username, "regra": regra, "erro": str(e), "contexto": contexto_para_log(contexto)},
-            )
-            sentry_sdk.capture_message(MENSAGEM_REGRA_NAO_AVALIADA, level="info")
         return False
 
 

@@ -4,6 +4,8 @@
 // Script clássico: expõe `window.track` e, no Node, `module.exports` (para testes).
 (function (raiz) {
     const MAX_MSG = 100;
+    // Distingue o ifrn25 do ifrn23 quando os dois compartilham a mesma propriedade do GA4.
+    const TEMA = 'ifrn25';
 
     const lerConfig = (doc) => {
         const el = doc && doc.getElementById('analytics-config');
@@ -30,6 +32,7 @@
         w.dataLayer = w.dataLayer || [];
         w.gtag = w.gtag || function () { w.dataLayer.push(arguments); };
         w.gtag('js', new Date());
+        w.gtag('set', 'user_properties', { tema: TEMA });
         w.gtag('config', id);
         const s = d.createElement('script');
         s.async = true;
@@ -71,6 +74,7 @@
         const config = lerConfig(d);
         if (config.clarity) {
             carregarClarity(w, d, config.clarity);
+            w.clarity('set', 'tema', TEMA);
         }
         if (config.gtag) {
             carregarGtag(w, d, config.gtag);

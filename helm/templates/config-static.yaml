@@ -74,6 +74,9 @@ data:
   # ======================
   GTAG_CODE: "G-DL5BKHKYBY"
   CLARITY_CODE: "pn9h14ln9l"
+  # theme_ifrn25: Clarity próprio; GA4 compartilhado com o ifrn23 (distinção pela propriedade de usuário "tema")
+  IFRN25_GTAG_CODE: "G-DL5BKHKYBY"
+  IFRN25_CLARITY_CODE: "z2f75pjd19"
 
   # ======================
   # Redis / Valkey

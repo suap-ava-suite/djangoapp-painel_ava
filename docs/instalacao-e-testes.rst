@@ -117,6 +117,10 @@ O tema ``ifrn25`` carrega GA4 e Microsoft Clarity com chaves **próprias**, inde
 - ``IFRN25_GTAG_CODE``: ID do GA4 (``G-XXXXXXX``).
 - ``IFRN25_CLARITY_CODE``: ID do projeto Clarity.
 
+O GA4 pode ser o mesmo ID do ``ifrn23``: o ifrn25 envia a propriedade de usuário ``tema=ifrn25`` (e a tag
+``tema`` no Clarity) para separar os relatórios. Para filtrar por ela no GA4, registre ``tema`` como
+dimensão personalizada de escopo de usuário.
+
 ``window.track(evento, params)`` (``theme_ifrn25/static/theme/ifrn25/js/analytics.js``) envia o evento
 aos dois serviços; é no-op quando nenhum está carregado. Erros de JavaScript não tratados
 (``error`` e ``unhandledrejection``) geram o evento ``js_error`` e as tags ``js_error`` e

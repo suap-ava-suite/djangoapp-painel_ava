@@ -54,6 +54,9 @@ jobs:
     environment:
       name: test
 
+    permissions:
+      contents: read
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -93,6 +96,9 @@ jobs:
       matrix:
         host: [ "${{ vars.PROD_HOST_1 }}", "${{ vars.PROD_HOST_2 }}", "${{ vars.PROD_HOST_3 }}" ]
 
+    permissions:
+      contents: read
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -120,6 +126,9 @@ jobs:
       always() && startsWith(github.ref, 'refs/tags/') &&
       !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') &&
       (needs.deploy-to-test.result == 'success' || needs.deploy-to-prod.result == 'success')
+
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout code

@@ -211,10 +211,8 @@ def _log_chamada_moodle(ava: Ambiente, service: str, inicio: float, resultado: s
 
 
 def get_json_api(ava: Ambiente, service: str, **params: dict):
-    if params is not None:
-        querystring = "&".join([f"{k}={v}" for k, v in params.items() if v is not None])
-    else:
-        querystring = ""
+    # Codifica os valores: nomes e e-mails com espaço, "&" ou "#" não podem quebrar a URL
+    querystring = urllib.parse.urlencode({k: v for k, v in (params or {}).items() if v is not None})
     url = f"{ava.moodle_base_api_url}/?{service}&{querystring}"
     inicio = time.monotonic()
     try:
@@ -361,11 +359,10 @@ def get_diarios(
 
         try:
             querystrings = {
-                k: v for k, v in params.items() if k not in ["ambiente", "results"] and str(v).strip() != ""
+                k: v
+                for k, v in params.items()
+                if k not in ["ambiente", "results", "usuario_db"] and str(v).strip() != ""
             }
-
-            if querystrings.get("q") is not None:
-                querystrings["q"] = urllib.parse.quote(querystrings["q"])
 
             return get_json_api(params["ambiente"], "get_diarios", **querystrings) or {}
         except Exception as e:

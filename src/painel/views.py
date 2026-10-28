@@ -92,7 +92,7 @@ def checkgrades(request: HttpRequest, id_ambiente: int, id_diario: int) -> HttpR
         get_json_api(
             ambiente,
             "get_diarios",
-            **{"username": logged_user(request).username, "q": f"%23{id_diario}", "situacao": Situacao.ALL},
+            **{"username": logged_user(request).username, "q": f"#{id_diario}", "situacao": Situacao.ALL},
         )
         or {}
     )
@@ -139,7 +139,9 @@ def get_tour_status(request: HttpRequest) -> HttpResponse:
 def curso_detalhes(request, id_ambiente, id_curso):
     ambiente = get_object_or_404(Ambiente, id=id_ambiente)
 
-    username = request.user.username if request.user.is_authenticated else ""
+    # Usuário ativo: o personificado, quando um superusuário personifica alguém
+    usuario = logged_user(request)
+    username = usuario.username if usuario and usuario.is_authenticated else ""
 
     curso_data = get_json_api(ambiente, "get_course_info", courseid=id_curso, username=username) or {}
 
@@ -168,7 +170,8 @@ def curso_detalhes(request, id_ambiente, id_curso):
 @require_POST
 def enrol_course(request, id_ambiente, id_curso):
     ambiente = get_object_or_404(Ambiente, id=id_ambiente)
-    user = request.user
+    # Inscreve o usuário ativo: o personificado, quando um superusuário personifica alguém
+    user = logged_user(request)
     profile = get_user_profile(user)
     username = user.username
 
@@ -209,7 +212,7 @@ def enrol_course(request, id_ambiente, id_curso):
 @require_POST
 def unenrol_course(request, id_ambiente, id_curso):
     ambiente = get_object_or_404(Ambiente, id=id_ambiente)
-    username = request.user.username
+    username = logged_user(request).username
 
     response = get_json_api(ambiente, "suspend_enrol", courseid=id_curso, username=username)
 

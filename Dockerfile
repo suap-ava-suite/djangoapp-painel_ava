@@ -1,13 +1,12 @@
-ARG BASEIMAGE=6.0.8.40
+ARG BASEIMAGE=6.0.8.46
 
 #########################
 # 1. Base stage
 ########################################################################
 FROM ctezlifrn/avaintegrationbase:$BASEIMAGE AS base
 
-# django-suap-auth 1.8.12: editor JSON do inline "Dados Brutos" ao adicionar registro (sobrepõe a versão do metapackage)
 RUN uv pip install --system \
-        django-compressor django-sass-processor django-suap-auth==1.8.12
+        django-compressor django-sass-processor
 
 
 #########################

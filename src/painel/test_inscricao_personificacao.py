@@ -130,6 +130,23 @@ def test_contexto_usa_vinculos_dos_dados_brutos_quando_nao_ha_vinculo_gravado(vi
 
 
 @pytest.mark.django_db
+def test_contexto_usa_dados_brutos_de_usuario_sem_perfil():
+    """Dados brutos cadastrados no admin para quem nunca logou: não há Perfil, mas a regra deve valer."""
+    from django_suap_auth.profile.models import DadosBrutos
+
+    from painel.v1.services import check_autoinscricao
+
+    user = get_user_model().objects.create_user(username="20240000000002")
+    DadosBrutos.objects.create(
+        user=user,
+        data={"tipo_usuario": "Aluno", "vinculos": {"count": 1, "next": None, "results": [VINCULO_INTEGRADO]}},
+    )
+    user = get_user_model().objects.get(pk=user.pk)
+
+    assert check_autoinscricao(REGRA_INICIACAO_INTEGRADO, user) is True
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize("vinculos", [None, {"count": 0, "results": []}, "inesperado"])
 def test_contexto_sem_vinculos_nos_dados_brutos_nao_quebra(vinculos):
     from painel.v1.services import check_autoinscricao, get_user_context

@@ -59,14 +59,12 @@ def get_compiled_rule(regra: str):
 
 
 def get_user_context(usuario_db) -> dict:
-    profile = getattr(usuario_db, "suap_profile", None)
-    if profile is None:
+    if not hasattr(usuario_db, "suap_vinculos"):
         # Fallback para compatibilidade caso usuario_db seja um modelo legado
-        if hasattr(usuario_db, "contexto"):
-            return usuario_db.contexto
-        return {}
+        return getattr(usuario_db, "contexto", None) or {}
 
-    # DadosBrutos e Vinculo se ligam ao usuário (suap_raw_data / suap_vinculos), não ao Perfil
+    # DadosBrutos e Vinculo se ligam ao usuário (suap_raw_data / suap_vinculos), não ao Perfil: não exige Perfil,
+    # que não existe para quem nunca logou (ex.: dados brutos cadastrados no admin para personificar)
     raw_data_obj = getattr(usuario_db, "suap_raw_data", None)
     last_json = dict(getattr(raw_data_obj, "data", None) or {}) if raw_data_obj else {}
 

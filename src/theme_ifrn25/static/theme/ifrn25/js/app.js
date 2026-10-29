@@ -18,6 +18,13 @@ const reportJsError = (mensagem, error) => {
     return { ...falha, eventId };
 };
 
+// Status de `enrol_course` que significam "o usuário está inscrito" (inclusive quando já estava).
+const STATUS_INSCRITO = ['enrolled', 'reactivated', 'already_enrolled'];
+
+// Resposta 2xx com status desconhecido: registra no Sentry para o diálogo ter um código a mostrar.
+const reportRespostaInesperada = (mensagem, data) =>
+    reportJsError(mensagem, new Error(`Status inesperado na inscrição: ${data?.status ?? typeof data}`));
+
 const getSalasIniciais = () => {
     const nomesAdmin = window.PAGE_CONFIG?.nomesAbas || {};
     const salas = {};
@@ -866,7 +873,7 @@ const app = Vue.createApp({
                     headers: { 'X-CSRFToken': this.getCsrfToken() }
                 });
 
-                if (response.data.status === 'enrolled' || response.data.status === 'reactivated') {
+                if (STATUS_INSCRITO.includes(response.data?.status)) {
                     item.is_enrolled = true;
                     this.track('matricula_sucesso', { origem: 'card', status: response.data.status });
                     this.filterCards(false);
@@ -874,9 +881,9 @@ const app = Vue.createApp({
                     // Opcional: Se quiser forçar o redirecionamento, descomente a linha abaixo
                     // window.location.href = `/course/view.php?id=${idCurso}`;
                 } else {
-                    console.error('Erro na inscrição:', response.data);
+                    const falha = reportRespostaInesperada('Erro na inscrição:', response.data);
                     this.track('matricula_falha', { origem: 'card', causa: 'resposta_inesperada' });
-                    window.ErrosRede.mostrarDialogo({ mensagem: "Não foi possível realizar a inscrição. Tente novamente.", causa: 'resposta_inesperada' });
+                    window.ErrosRede.mostrarDialogo({ mensagem: "Não foi possível realizar a inscrição. Tente novamente.", codigo: falha.eventId, causa: 'resposta_inesperada' });
                 }
             } catch (error) {
                 const falha = reportJsError('Erro:', error);
@@ -900,13 +907,14 @@ const app = Vue.createApp({
 
                 console.log('Resposta da inscrição:', response.data);
 
-                if (response.data.status === 'enrolled' || response.data.status === 'reactivated') {
+                if (STATUS_INSCRITO.includes(response.data?.status)) {
                     // Após inscrição, redireciona para o curso no Moodle
                     this.track('matricula_sucesso', { origem: 'detalhes', status: response.data.status });
                     window.location.href = `${moodleUrl}/course/view.php?id=${idCurso}`;
                 } else {
-                    console.error('Erro na inscrição:', response.data);
+                    const falha = reportRespostaInesperada('Erro na inscrição:', response.data);
                     this.track('matricula_falha', { origem: 'detalhes', causa: 'resposta_inesperada' });
+                    window.ErrosRede.mostrarDialogo({ mensagem: "Não foi possível realizar a inscrição. Tente novamente.", codigo: falha.eventId, causa: 'resposta_inesperada' });
                 }
             } catch (error) {
                 const falha = reportJsError('Erro:', error);

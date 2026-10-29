@@ -132,6 +132,11 @@
         font: var(--font-paragraph2);
         font-size: 0.85em;
 
+        /* Sem código de evento (Sentry inativo ou sem evento), o bloco não aparece */
+        &.hidden {
+            display: none;
+        }
+
         code {
             display: block;
             margin: 0.25rem 0;

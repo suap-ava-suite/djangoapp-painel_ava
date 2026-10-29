@@ -15,7 +15,7 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
-    "avaintegration-metapackage==6.0.8.40",
+    "avaintegration-metapackage==6.0.8.46",
 ]
 
 [project.optional-dependencies]

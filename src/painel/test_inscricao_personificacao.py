@@ -84,3 +84,58 @@ def test_bloco_do_codigo_do_erro_fica_oculto_com_a_classe_hidden():
 
     assert bloco, "regra #aviso-modal-codigo não encontrada"
     assert re.search(r"&\.hidden\s*\{\s*display:\s*none;", bloco["corpo"])
+
+
+REGRA_INICIACAO_INTEGRADO = (
+    "tipo_usuario in ['Aluno'] and $any([m['tipo'] == 'aluno' and m['detalhamento']['ativo'] == true "
+    "and m['detalhamento']['modalidade'] in ['Técnico integrado ao ensino médio'] for m in outras_matriculas])"
+)
+
+
+def _aluno_com_dados_brutos(vinculos):
+    from django_suap_auth.profile.models import DadosBrutos, Perfil
+
+    user = get_user_model().objects.create_user(username="20240000000001")
+    Perfil.objects.create(user=user)
+    DadosBrutos.objects.create(user=user, data={"tipo_usuario": "Aluno", "vinculos": vinculos})
+    return get_user_model().objects.get(pk=user.pk)
+
+
+VINCULO_INTEGRADO = {
+    "identificador": "20240000000001",
+    "tipo": "aluno",
+    "detalhamento": {"ativo": True, "modalidade": "Técnico integrado ao ensino médio", "campus": "CNAT"},
+}
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "vinculos",
+    [
+        {"count": 1, "next": None, "previous": None, "results": [VINCULO_INTEGRADO]},
+        [VINCULO_INTEGRADO],
+    ],
+    ids=["paginado", "lista"],
+)
+def test_contexto_usa_vinculos_dos_dados_brutos_quando_nao_ha_vinculo_gravado(vinculos):
+    from painel.v1.services import check_autoinscricao, get_user_context
+
+    user = _aluno_com_dados_brutos(vinculos)
+
+    contexto = get_user_context(user)
+    assert [(m["tipo"], m["campus"], m["detalhamento"]["modalidade"]) for m in contexto["outras_matriculas"]] == [
+        ("aluno", "CNAT", "Técnico integrado ao ensino médio")
+    ]
+    assert check_autoinscricao(REGRA_INICIACAO_INTEGRADO, user) is True
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("vinculos", [None, {"count": 0, "results": []}, "inesperado"])
+def test_contexto_sem_vinculos_nos_dados_brutos_nao_quebra(vinculos):
+    from painel.v1.services import check_autoinscricao, get_user_context
+
+    user = _aluno_com_dados_brutos(vinculos)
+
+    assert get_user_context(user)["outras_matriculas"] == []
+    assert check_autoinscricao(REGRA_INICIACAO_INTEGRADO, user) is False
+    assert check_autoinscricao("tipo_usuario in ['Aluno']", user) is True

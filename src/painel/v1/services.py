@@ -73,31 +73,84 @@ def get_user_context(usuario_db) -> dict:
     matriculas = []
     if hasattr(usuario_db, "suap_vinculos"):
         for v in usuario_db.suap_vinculos.all():
-            det = dict(v.detalhamento or {})
-            det.setdefault("nivel_ensino", v.nivel_ensino or "")
-            det.setdefault("modalidade", v.modalidade or "")
-            det.setdefault("curso", v.curso or "")
-            if det.get("ativo") is None:
-                det["ativo"] = v.ativo if v.ativo is not None else False
-
             matriculas.append(
-                {
-                    "identificador": v.identificador or "",
-                    "tipo": v.tipo or "",
-                    "campus": v.campus or "",
-                    "cargo": v.cargo or "",
-                    "categoria": v.categoria or "",
-                    "modalidade": v.modalidade or "",
-                    "nivel_ensino": v.nivel_ensino or "",
-                    "curso": v.curso or "",
-                    "ativo": v.ativo if v.ativo is not None else False,
-                    "estrangeiro": v.estrangeiro or False,
-                    "detalhamento": det,
-                }
+                _montar_matricula(
+                    identificador=v.identificador,
+                    tipo=v.tipo,
+                    campus=v.campus,
+                    cargo=v.cargo,
+                    categoria=v.categoria,
+                    modalidade=v.modalidade,
+                    nivel_ensino=v.nivel_ensino,
+                    curso=v.curso,
+                    ativo=v.ativo,
+                    estrangeiro=v.estrangeiro,
+                    detalhamento=v.detalhamento,
+                )
             )
+
+    if not matriculas:
+        # O django_suap_auth não grava Vinculo quando /api/rh/meus-vinculos/ vem paginado
+        # ({count, next, previous, results}); usa os vínculos guardados nos dados brutos.
+        matriculas = _matriculas_dos_dados_brutos(last_json.get("vinculos"))
 
     last_json["outras_matriculas"] = matriculas
     return last_json
+
+
+def _montar_matricula(
+    *, identificador, tipo, campus, cargo, categoria, modalidade, nivel_ensino, curso, ativo, estrangeiro, detalhamento
+) -> dict:
+    det = dict(detalhamento or {})
+    det.setdefault("nivel_ensino", nivel_ensino or "")
+    det.setdefault("modalidade", modalidade or "")
+    det.setdefault("curso", curso or "")
+    if det.get("ativo") is None:
+        det["ativo"] = ativo if ativo is not None else False
+
+    return {
+        "identificador": identificador or "",
+        "tipo": tipo or "",
+        "campus": campus or "",
+        "cargo": cargo or "",
+        "categoria": categoria or "",
+        "modalidade": modalidade or "",
+        "nivel_ensino": nivel_ensino or "",
+        "curso": curso or "",
+        "ativo": ativo if ativo is not None else False,
+        "estrangeiro": estrangeiro or False,
+        "detalhamento": det,
+    }
+
+
+def _matriculas_dos_dados_brutos(vinculos) -> list:
+    """Vínculos de /api/rh/meus-vinculos/ (lista ou resposta paginada), com o mesmo mapeamento do django_suap_auth."""
+    if isinstance(vinculos, dict):
+        vinculos = vinculos.get("results")
+    if not isinstance(vinculos, list):
+        return []
+
+    matriculas = []
+    for item in vinculos:
+        if not isinstance(item, dict):
+            continue
+        det = item.get("detalhamento") if isinstance(item.get("detalhamento"), dict) else {}
+        matriculas.append(
+            _montar_matricula(
+                identificador=str(item.get("identificador", "")),
+                tipo=item.get("tipo"),
+                campus=item.get("campus") or det.get("campus"),
+                cargo=item.get("cargo") or det.get("cargo"),
+                categoria=item.get("categoria") or det.get("categoria"),
+                modalidade=item.get("modalidade") or det.get("modalidade"),
+                nivel_ensino=item.get("nivel_ensino") or det.get("nivel_ensino"),
+                curso=item.get("curso") or det.get("curso"),
+                ativo=item.get("ativo") if item.get("ativo") is not None else det.get("ativo"),
+                estrangeiro=bool(item.get("estrangeiro", False)),
+                detalhamento=det,
+            )
+        )
+    return matriculas
 
 
 # Campos do contexto que podem ir para logs e Sentry: nada que identifique a pessoa (CPF, e-mails, nascimento...)

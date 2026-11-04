@@ -48,30 +48,3 @@ test('formatarData trata nulo e timestamp do Moodle', () => {
     assert.notEqual(formatarData(1790000000), '—');
     assert.equal(formatarData('xyz'), '—');
 });
-
-const { trechosDaRegra, formatarValor } = require(path.join(JS_DIR, 'diagnostico.js'));
-
-test('trechosDaRegra marca cada comparação na ordem do texto', () => {
-    const regra = "a == 1 and $any([m['x'] == 'a' and m['y'] == 2 for m in outras_matriculas])";
-    const trechos = trechosDaRegra(regra, [
-        { atomo: 'a == 1', atendido: true },
-        { atomo: "m['x'] == 'a'", atendido: false },
-        { atomo: "m['y'] == 2", atendido: null },
-        { atomo: 'não existe', atendido: true },
-    ]);
-    assert.equal(trechos.map((t) => t.texto).join(''), regra);
-    assert.deepEqual(
-        trechos.filter((t) => 'atendido' in t).map((t) => [t.texto, t.atendido]),
-        [['a == 1', true], ["m['x'] == 'a'", false], ["m['y'] == 2", null]]
-    );
-});
-
-test('trechosDaRegra sem linhas devolve a regra inteira', () => {
-    assert.deepEqual(trechosDaRegra('x == 1', []), [{ texto: 'x == 1' }]);
-});
-
-test('formatarValor mostra aspas para revelar diferenças de grafia', () => {
-    assert.equal(formatarValor('Técnico Integrado'), '"Técnico Integrado"');
-    assert.equal(formatarValor(undefined), '—');
-    assert.equal(formatarValor(true), 'true');
-});

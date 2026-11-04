@@ -16,7 +16,7 @@ import requests
 from django.contrib.auth import get_user_model
 from django.http import HttpRequest, JsonResponse
 from django.views.decorators.http import require_GET
-from django_rule_engine.explain import explain
+from django_rule_engine.explain_tree import explain_tree
 from django_suap_auth.impersonation.helpers import is_impersonating
 
 from painel.models import Ambiente
@@ -253,17 +253,25 @@ def _situacao_inscricao(curso: dict) -> str:
     return "nenhuma"
 
 
+def _rotulo_matricula(item) -> str:
+    """Rótulo dos itens de outras_matriculas nos blocos: campus e curso, sem o identificador."""
+    if not isinstance(item, dict):
+        return ""
+    curso = item.get("curso") or (item.get("detalhamento") or {}).get("curso") or ""
+    return " · ".join(str(parte) for parte in (item.get("campus"), curso) if parte)
+
+
 def _avaliar_curso(curso: dict, usuario, contexto: dict) -> dict:
     regra = (curso.get("restricoes_de_autoinscricao") or "").strip()
     atende, motivo, detalhe = avaliar_autoinscricao(regra, usuario, contexto if usuario else None)
     visivel = bool(curso.get("visible", True))
-    condicoes = []
+    arvore = None
     indices = []
     if usuario and regra and motivo != MOTIVO_OK:
-        explicacao = explain(regra, contexto, sensitive=CAMPOS_SENSIVEIS)
-        condicoes = explicacao["condicoes"]
+        # Explicação nó a nó (django-rule-engine), desenhada em blocos no front (RuleBlocks)
+        arvore = explain_tree(regra, contexto, sensitive=CAMPOS_SENSIVEIS, item_label=_rotulo_matricula)
         # Mensagem do erro da regra vem da explicação da django-rule-engine (já tratada por ela)
-        detalhe = explicacao.get("erro") or detalhe
+        detalhe = arvore.get("erro") or detalhe
         indices = _indices_que_atenderiam(regra, contexto)
     return {
         "courseid": curso.get("courseid") or curso.get("id"),
@@ -274,7 +282,7 @@ def _avaliar_curso(curso: dict, usuario, contexto: dict) -> dict:
         "atende": atende,
         "motivo": motivo,
         "detalhe": detalhe,
-        "condicoes": condicoes,
+        "arvore": arvore,
         "indices_que_atenderiam": indices,
         "campos_da_regra": _campos_da_regra(regra, contexto) if usuario else {},
         "inscricao": _situacao_inscricao(curso),

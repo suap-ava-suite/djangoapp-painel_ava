@@ -52,31 +52,6 @@
         };
     }
 
-    // Fatia a regra em trechos: cada comparação (na ordem em que aparece) recebe o seu "atendido".
-    function trechosDaRegra(regra, linhas) {
-        const trechos = [];
-        let cursor = 0;
-        (linhas || []).forEach((linha) => {
-            const inicio = linha.atomo ? regra.indexOf(linha.atomo, cursor) : -1;
-            if (inicio < 0) {
-                return;
-            }
-            if (inicio > cursor) {
-                trechos.push({ texto: regra.slice(cursor, inicio) });
-            }
-            trechos.push({ texto: linha.atomo, atendido: linha.atendido });
-            cursor = inicio + linha.atomo.length;
-        });
-        if (cursor < regra.length) {
-            trechos.push({ texto: regra.slice(cursor) });
-        }
-        return trechos;
-    }
-
-    function formatarValor(valor) {
-        return valor === undefined ? '—' : JSON.stringify(valor);
-    }
-
     function formatarData(valor) {
         if (!valor) {
             return 'nunca';
@@ -267,68 +242,26 @@
             painelPersonificar.appendChild(botao);
         };
 
-        const marca = (ok) => (ok === true ? '✔' : ok === false ? '✖' : '⚠');
-        const classeAtendido = (ok) =>
-            ok === true ? 'diagnostico-trecho-sim' : ok === false ? 'diagnostico-trecho-nao' : 'diagnostico-trecho-erro';
-
-        const regraColorida = (regra, linhas) => {
-            const bloco = el('code', null, 'diagnostico-regra');
-            trechosDaRegra(regra, linhas).forEach((t) => {
-                if (!('atendido' in t)) {
-                    bloco.appendChild(d.createTextNode(t.texto));
-                    return;
-                }
-                const trecho = el('span', t.texto, classeAtendido(t.atendido));
-                trecho.title = t.atendido === true ? 'Atendido' : t.atendido === false ? 'Não atendido' : 'Erro ao avaliar';
-                bloco.appendChild(trecho);
-            });
-            return bloco;
-        };
-
-        const celulaValor = (valor, ok, erro) => el('span', `${marca(ok)} ${erro || formatarValor(valor)}`, classeAtendido(ok));
-
-        const tabelaComparacoes = (detalhes, matriculas) => {
-            const esperado = (l) => `${l.operador} ${l.esperado}`.trim();
-            if (detalhes.tipo !== 'por_item') {
-                return tabela(
-                    ['Campo', 'Esperado', 'Usuário'],
-                    detalhes.linhas.map((l) => [l.rotulo, esperado(l), celulaValor(l.sensivel ? '(oculto)' : l.valor, l.atendido, l.erro)])
-                );
+        // Blocos encaixados da explicação (django-rule-engine: RuleBlocks, rule_blocks.js/css)
+        const blocosDaRegra = (arvore) => {
+            const caixa = el('div', null, 'diagnostico-blocos');
+            if (raiz.RuleBlocks) {
+                raiz.RuleBlocks.render(caixa, arvore);
+            } else {
+                caixa.appendChild(el('p', 'Desenho da regra indisponível (rule_blocks.js não carregou).', 'diagnostico-aviso'));
             }
-            const quantidade = Math.max(0, ...detalhes.linhas.map((l) => (l.resultados || []).length));
-            const vinculos = Array.from({ length: quantidade }, (_, i) => {
-                const m = matriculas[i] || {};
-                return `Vínculo #${i}${m.campus ? ` (${m.campus})` : ''}`;
-            });
-            const linhas = detalhes.linhas.map((l) => [
-                l.rotulo,
-                esperado(l),
-                ...(quantidade
-                    ? vinculos.map((_, i) => celulaValor(l.sensivel ? '(oculto)' : l.valores?.[i], l.resultados?.[i], l.erro))
-                    : [celulaValor(undefined, l.atendido, l.erro || 'usuário sem vínculos')]),
-            ]);
-            const caixa = el('div', null, 'diagnostico-comparacoes');
-            const regraDaFuncao =
-                detalhes.funcao === 'any'
-                    ? 'basta um vínculo atender a todas as linhas'
-                    : 'todos os vínculos precisam atender a todas as linhas';
-            caixa.appendChild(el('p', `${detalhes.funcao === 'any' ? '$any' : '$all'} em outras_matriculas: ${regraDaFuncao}.`));
-            caixa.appendChild(tabela(['Campo', 'Esperado', ...(quantidade ? vinculos : ['Usuário'])], linhas));
             return caixa;
         };
 
-        const renderCurso = (curso, matriculas) => {
+        const renderCurso = (curso) => {
             const detalhes = el('div');
-            const linhasRegra = curso.condicoes.flatMap((c) => (c.detalhes && c.detalhes.linhas) || []);
-            detalhes.appendChild(regraColorida(curso.regra || '(sem regra)', linhasRegra));
+            detalhes.appendChild(el('code', curso.regra || '(sem regra)', 'diagnostico-regra'));
             if (curso.detalhe) {
                 detalhes.appendChild(el('p', curso.detalhe, 'diagnostico-alerta'));
             }
-            curso.condicoes.forEach((c) => {
-                if (c.detalhes && c.detalhes.linhas.length) {
-                    detalhes.appendChild(tabelaComparacoes(c.detalhes, matriculas));
-                }
-            });
+            if (curso.arvore) {
+                detalhes.appendChild(blocosDaRegra(curso.arvore));
+            }
             if (curso.indices_que_atenderiam.length) {
                 detalhes.appendChild(
                     el(
@@ -370,7 +303,7 @@
                     return;
                 }
                 painelAutoinscricao.appendChild(
-                    tabela(['Curso', 'Atende?', 'Visível', 'Inscrição', 'Aparece no Painel', 'Por quê'], a.cursos.map((c) => renderCurso(c, (dados.contexto && dados.contexto.matriculas) || [])))
+                    tabela(['Curso', 'Atende?', 'Visível', 'Inscrição', 'Aparece no Painel', 'Por quê'], a.cursos.map((c) => renderCurso(c)))
                 );
             });
             const ctx = dados.contexto;
@@ -450,6 +383,6 @@
         iniciar(document);
     }
     if (typeof module !== 'undefined' && module.exports) {
-        module.exports = { urlPara, paramsConsulta, paramsAutoinscricao, formatarData, trechosDaRegra, formatarValor };
+        module.exports = { urlPara, paramsConsulta, paramsAutoinscricao, formatarData };
     }
 })(typeof window !== 'undefined' ? window : globalThis);

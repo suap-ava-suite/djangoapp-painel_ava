@@ -36,8 +36,12 @@ informa para cada um:
 
 - **Atende?** e o motivo: ``ok``, ``regra_falsa``, ``regra_vazia``, ``regra_invalida``,
   ``erro_avaliacao`` ou ``usuario_inexistente_painel``, com a mensagem de erro quando houver;
-- as condições de nível superior da regra (quando ela é uma sequência de ``and`` ou de ``or``), com o
-  resultado de cada uma;
+- quando não atende, a regra desenhada em blocos encaixados (estilo Scratch), em verde o que foi
+  atendido e em vermelho o que não foi, com o valor do usuário ao lado do esperado. Em
+  ``$any``/``$all`` sobre ``outras_matriculas``, cada vínculo vira um item (rotulado por campus e
+  curso), e o que chega mais perto de atender vem aberto. A explicação vem de
+  ``django_rule_engine.explain_tree`` e o desenho de ``rule_widget/rule_blocks.js`` (django-rule-engine
+  1.2.0);
 - se a regra usa ``outras_matriculas[0]``, em quais índices de vínculo ela passaria (causa comum
   para quem tem mais de um vínculo);
 - os valores do usuário citados pela regra (sem CPF, e-mail, telefone etc.);

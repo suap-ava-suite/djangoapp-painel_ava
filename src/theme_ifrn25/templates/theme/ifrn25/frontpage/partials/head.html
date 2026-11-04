@@ -44,6 +44,7 @@
     <link rel="stylesheet" href="{% static 'theme/ifrn25/css/modals/popup-modal.css' %}?last_startup={{ last_startup }}">
     <link rel="stylesheet" href="{% static 'theme/ifrn25/css/modals/accessibility.css' %}?last_startup={{ last_startup }}">
     {% if user.is_superuser %}
+        <link rel="stylesheet" href="{% static 'rule_widget/rule_blocks.css' %}?last_startup={{ last_startup }}">
         <link rel="stylesheet" href="{% static 'theme/ifrn25/css/modals/diagnostico.css' %}?last_startup={{ last_startup }}">
     {% endif %}
 

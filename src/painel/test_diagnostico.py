@@ -263,7 +263,7 @@ def test_autoinscricao_explica_por_que_nao_atende(usuarios, ambientes):
     assert c[1]["aparece_no_painel"] is True
 
     assert c[2]["atende"] is False and c[2]["motivo"] == MOTIVO_REGRA_FALSA
-    assert [x["resultado"] for x in c[2]["condicoes"]] == [True, False]
+    assert [x["atendido"] for x in c[2]["arvore"]["raiz"]["filhos"]] == [True, False]
     assert c[2]["indices_que_atenderiam"] == [1]
     assert c[2]["campos_da_regra"] == {"tipo_usuario": "Aluno"}
     assert c[2]["inscricao"] == "nenhuma"
@@ -419,34 +419,51 @@ def _curso(regra):
     return {"courseid": 1, "fullname": "X", "visible": True, "restricoes_de_autoinscricao": regra}
 
 
-def test_avaliar_curso_usa_explain_da_django_rule_engine(usuarios):
+def test_avaliar_curso_usa_explain_tree_da_django_rule_engine(usuarios):
     _, _, aluno = usuarios
     curso = diagnostico._avaliar_curso(_curso(REGRA_EJA), aluno, CONTEXTO_EJA)
 
-    simples, por_item = curso["condicoes"]
-    linha = simples["detalhes"]["linhas"][0]
-    assert simples["detalhes"]["tipo"] == "simples"
-    assert (linha["rotulo"], linha["operador"], linha["esperado"]) == ("tipo_usuario", "in", "['Aluno']")
-    assert linha["valor"] == "Aluno" and linha["atendido"] is True
+    arvore = curso["arvore"]
+    assert arvore["atendido"] is False
+    contem, funcao = arvore["raiz"]["filhos"]
+    assert contem["tipo"] == "contem" and contem["atendido"] is True
+    assert contem["esquerda"]["rotulo"] == "tipo_usuario" and contem["esquerda"]["valor"] == "Aluno"
 
-    detalhes = por_item["detalhes"]
-    assert detalhes["tipo"] == "por_item" and detalhes["funcao"] == "any"
-    tipo, ativo, modalidade = detalhes["linhas"]
-    assert tipo["rotulo"] == "tipo" and tipo["valores"] == ["aluno", "Aluno"] and tipo["resultados"] == [True, False]
-    assert ativo["rotulo"] == "detalhamento.ativo" and ativo["valores"] == [True, False]
-    assert modalidade["valores"] == ["Técnico Integrado", "Técnico subsequente"]
-    assert modalidade["resultados"] == [False, True]
+    comp = funcao["argumentos"][0]
+    assert funcao["nome"] == "$any" and comp["tipo"] == "compreensao" and comp["total"] == 2
+    primeiro, segundo = comp["itens"]
+    assert [f["atendido"] for f in primeiro["expressao"]["filhos"]] == [True, True, False]
+    assert [f["atendido"] for f in segundo["expressao"]["filhos"]] == [False, False, True]
+    modalidade = primeiro["expressao"]["filhos"][2]
+    assert modalidade["esquerda"]["rotulo"] == "m.detalhamento.modalidade"
+    assert modalidade["esquerda"]["valor"] == "Técnico Integrado"
     assert curso["atende"] is False and curso["motivo"] == MOTIVO_REGRA_FALSA
+
+
+def test_rotulo_dos_vinculos_usa_campus_e_curso_sem_identificador(usuarios):
+    _, _, aluno = usuarios
+    contexto = {
+        "tipo_usuario": "Aluno",
+        "outras_matriculas": [
+            {"identificador": "20250000000001", "campus": "ZN", "curso": "Eletrônica", "tipo": "aluno"},
+            {"identificador": "20250000000002", "tipo": "aluno", "detalhamento": {"curso": "FIC"}},
+        ],
+    }
+    curso = diagnostico._avaliar_curso(_curso("$any([m['tipo'] == 'x' for m in outras_matriculas])"), aluno, contexto)
+    itens = curso["arvore"]["raiz"]["argumentos"][0]["itens"]
+    assert [i["rotulo"] for i in itens] == ["ZN · Eletrônica", "FIC"]
+    assert diagnostico._rotulo_matricula("x") == ""
 
 
 def test_avaliar_curso_oculta_campos_sensiveis_do_painel(usuarios):
     _, _, aluno = usuarios
     curso = diagnostico._avaliar_curso(_curso("cpf == '123'"), aluno, CONTEXTO_EJA)
-    linha = curso["condicoes"][0]["detalhes"]["linhas"][0]
-    assert linha["sensivel"] is True and linha["valor"] is None and linha["atendido"] is False
+    lado = curso["arvore"]["raiz"]["esquerda"]
+    assert lado["sensivel"] is True and lado["valor"] is None
+    assert curso["arvore"]["raiz"]["atendido"] is False
 
 
 def test_avaliar_curso_que_atende_nao_detalha(usuarios):
     _, _, aluno = usuarios
     curso = diagnostico._avaliar_curso(_curso("tipo_usuario == 'Aluno'"), aluno, CONTEXTO_EJA)
-    assert curso["atende"] is True and curso["condicoes"] == []
+    assert curso["atende"] is True and curso["arvore"] is None

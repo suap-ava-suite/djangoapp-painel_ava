@@ -1,4 +1,4 @@
-ARG BASEIMAGE=6.0.8.48
+ARG BASEIMAGE=6.0.8.49
 
 #########################
 # 1. Base stage

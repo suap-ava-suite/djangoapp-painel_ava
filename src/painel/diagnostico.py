@@ -81,16 +81,23 @@ def _chamar_moodle(ava: Ambiente, servico: str, **params: Any) -> Any:
         try:
             mensagem = json.loads(getattr(e, "body", "") or "")["error"]["message"]
         except ValueError, KeyError, TypeError:
-            mensagem = f"HTTP {status}"
+            mensagem = ""
         if status == 404 and mensagem == MOODLE_SERVICO_INEXISTENTE:
             raise MoodleIndisponivel(STATUS_ENDPOINT_INDISPONIVEL, "Atualize o tool_painelava deste Moodle.")
-        raise MoodleIndisponivel(STATUS_ERRO, f"O Moodle respondeu com erro HTTP {status}.", mensagem)
+        logger.warning(f"Diagnóstico: Moodle '{ava.nome}' {servico} respondeu HTTP {status}: {mensagem}")
+        raise MoodleIndisponivel(STATUS_ERRO, f"O Moodle respondeu com erro HTTP {status}.", f"HTTP {status}")
     except requests.exceptions.Timeout as e:
-        raise MoodleIndisponivel(STATUS_ERRO, "O Moodle não respondeu a tempo.", f"{type(e).__name__}: {e}")
+        raise _falha_de_rede(ava, servico, e, "O Moodle não respondeu a tempo.")
     except requests.exceptions.ConnectionError as e:
-        raise MoodleIndisponivel(STATUS_ERRO, "Não foi possível conectar ao Moodle.", f"{type(e).__name__}: {e}")
+        raise _falha_de_rede(ava, servico, e, "Não foi possível conectar ao Moodle.")
     except (requests.exceptions.RequestException, ValueError) as e:
-        raise MoodleIndisponivel(STATUS_ERRO, "Resposta inválida do Moodle.", f"{type(e).__name__}: {e}")
+        raise _falha_de_rede(ava, servico, e, "Resposta inválida do Moodle.")
+
+
+def _falha_de_rede(ava: Ambiente, servico: str, erro: Exception, mensagem: str) -> MoodleIndisponivel:
+    """O texto da exceção fica só no log do servidor; a resposta leva apenas o tipo da falha."""
+    logger.warning(f"Diagnóstico: Moodle '{ava.nome}' {servico}: {type(erro).__name__}: {erro}")
+    return MoodleIndisponivel(STATUS_ERRO, mensagem, type(erro).__name__)
 
 
 def _ambiente_json(ava: Ambiente) -> dict:
@@ -253,7 +260,10 @@ def _avaliar_curso(curso: dict, usuario, contexto: dict) -> dict:
     condicoes = []
     indices = []
     if usuario and regra and motivo != MOTIVO_OK:
-        condicoes = explain(regra, contexto, sensitive=CAMPOS_SENSIVEIS)["condicoes"]
+        explicacao = explain(regra, contexto, sensitive=CAMPOS_SENSIVEIS)
+        condicoes = explicacao["condicoes"]
+        # Mensagem do erro da regra vem da explicação da django-rule-engine (já tratada por ela)
+        detalhe = explicacao.get("erro") or detalhe
         indices = _indices_que_atenderiam(regra, contexto)
     return {
         "courseid": curso.get("courseid") or curso.get("id"),

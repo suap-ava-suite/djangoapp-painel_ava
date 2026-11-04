@@ -188,7 +188,7 @@ def avaliar_autoinscricao(regra: str, usuario_db, contexto: Union[dict, None] = 
         rule = get_compiled_rule(regra)
     except Exception as e:
         logger.error(f"Regra inválida: {e}. {regra}")
-        return False, MOTIVO_REGRA_INVALIDA, f"{type(e).__name__}: {e}"
+        return False, MOTIVO_REGRA_INVALIDA, type(e).__name__
 
     if contexto is None:
         contexto = get_user_context(usuario_db)
@@ -200,7 +200,7 @@ def avaliar_autoinscricao(regra: str, usuario_db, contexto: Union[dict, None] = 
         logger.warning(
             f'Erro ao avaliar para {username} a regra "{regra}". Erro: {e}. Contexto: {contexto_para_log(contexto)}'
         )
-        return False, MOTIVO_ERRO_AVALIACAO, f"{type(e).__name__}: {e}"
+        return False, MOTIVO_ERRO_AVALIACAO, type(e).__name__
 
     sucesso = "PASSOU" if resultado else "FOI BLOQUEADO"
     logger.debug(f'Usuário {username} {sucesso} na regra "{regra}". Contexto: {contexto_para_log(contexto)}')

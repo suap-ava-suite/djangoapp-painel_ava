@@ -384,3 +384,45 @@ def test_suite_node_do_diagnostico_passa():
         timeout=120,
     )
     assert resultado.returncode == 0, resultado.stdout + resultado.stderr
+
+
+def _http_sem_json(status):
+    exc = HTTPException(f"{status}")
+    exc.status = status
+    exc.body = "<html>erro</html>"
+    return exc
+
+
+@pytest.mark.parametrize(
+    "falha,mensagem,detalhe",
+    [
+        (_http_sem_json(502), "O Moodle respondeu com erro HTTP 502.", "HTTP 502"),
+        (requests.exceptions.ConnectionError("recusada"), "Não foi possível conectar ao Moodle.", "ConnectionError"),
+        (requests.exceptions.ReadTimeout("lento"), "O Moodle não respondeu a tempo.", "ReadTimeout"),
+        (requests.exceptions.TooManyRedirects("loop"), "Resposta inválida do Moodle.", "TooManyRedirects"),
+        (ValueError("json"), "Resposta inválida do Moodle.", "ValueError"),
+    ],
+)
+def test_chamar_moodle_classifica_falhas(ambientes, falha, mensagem, detalhe):
+    with patch("painel.diagnostico.get_json", side_effect=falha):
+        with pytest.raises(diagnostico.MoodleIndisponivel) as erro:
+            diagnostico._chamar_moodle(ambientes[0], "get_diagnostico_usuario", username="x")
+    assert erro.value.status == "erro"
+    assert erro.value.mensagem == mensagem
+    assert detalhe in erro.value.detalhe
+
+
+@pytest.mark.parametrize("email,esperado", [("", ""), (None, ""), ("sem-arroba", ""), ("ab@x.test", "ab***@x.test")])
+def test_mascarar_email(email, esperado):
+    assert diagnostico._mascarar_email(email) == esperado
+
+
+def test_parenteses_externos_que_nao_envolvem_tudo_nao_sao_removidos():
+    assert diagnostico._dividir_condicoes("(a == 1) or (b == 2)") == ["(a == 1)", "(b == 2)"]
+    assert diagnostico._fecha_no_final("(a) and (b)") is False
+    assert diagnostico._fecha_no_final("(a == ')' and b)") is True
+
+
+def test_avaliar_condicao_com_erro():
+    resultado = diagnostico._avaliar_condicao("chave_inexistente == 1", {})
+    assert resultado["resultado"] is None and resultado["erro"]

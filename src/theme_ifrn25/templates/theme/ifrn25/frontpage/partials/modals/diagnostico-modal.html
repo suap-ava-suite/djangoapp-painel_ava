@@ -1,0 +1,33 @@
+{% if user.is_superuser and not personificando %}
+    <div id="diagnostico-modal"
+         class="diagnostico-overlay hidden"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="diagnostico-titulo"
+         data-url-usuario="{% url 'painel:diagnostico_usuario' username='__username__' %}"
+         data-url-autoinscricao="{% url 'painel:diagnostico_autoinscricao' username='__username__' %}"
+         data-url-personificar="{% url 'suap_auth_impersonation:impersonate_param' %}">
+        <div class="diagnostico-conteudo">
+            <div class="diagnostico-cabecalho">
+                <h2 id="diagnostico-titulo">Diagnosticar usuário</h2>
+                <button type="button" id="diagnostico-fechar" class="diagnostico-fechar" aria-label="Fechar">&times;</button>
+            </div>
+            <form id="diagnostico-form" class="diagnostico-form" autocomplete="off">
+                <label for="diagnostico-username">Username (matrícula)</label>
+                <div class="diagnostico-form-linha">
+                    <input type="text" id="diagnostico-username" name="username" required maxlength="150" spellcheck="false">
+                    <button type="submit" id="diagnostico-consultar" class="diagnostico-btn">Diagnosticar</button>
+                </div>
+            </form>
+            <p id="diagnostico-status" class="diagnostico-status" role="status" aria-live="polite"></p>
+            <div id="diagnostico-resultado" class="hidden">
+                <div class="diagnostico-abas" role="tablist">
+                    <button type="button" role="tab" id="diagnostico-aba-personificar" aria-controls="diagnostico-painel-personificar" aria-selected="true" data-aba="personificar">Personificar</button>
+                    <button type="button" role="tab" id="diagnostico-aba-autoinscricao" aria-controls="diagnostico-painel-autoinscricao" aria-selected="false" data-aba="autoinscricao" tabindex="-1">Auto inscrição</button>
+                </div>
+                <section id="diagnostico-painel-personificar" role="tabpanel" aria-labelledby="diagnostico-aba-personificar" class="diagnostico-painel"></section>
+                <section id="diagnostico-painel-autoinscricao" role="tabpanel" aria-labelledby="diagnostico-aba-autoinscricao" class="diagnostico-painel hidden"></section>
+            </div>
+        </div>
+    </div>
+{% endif %}

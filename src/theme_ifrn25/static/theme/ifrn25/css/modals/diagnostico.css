@@ -1,0 +1,189 @@
+/* Diagnóstico de usuário (somente superusuários) */
+#diagnostico-modal {
+    &.diagnostico-overlay {
+        position: fixed;
+        inset: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        padding: 1rem;
+    }
+
+    &.hidden,
+    .hidden {
+        display: none;
+    }
+
+    .diagnostico-conteudo {
+        background: var(--general-white);
+        color: #222;
+        border-radius: 1rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        padding: 1.25rem;
+        width: min(96vw, 1100px);
+        max-height: 90vh;
+        overflow-y: auto;
+        font: var(--font-paragraph2);
+    }
+
+    .diagnostico-cabecalho {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        h2 {
+            font: var(--font-heading2);
+            margin: 0;
+        }
+    }
+
+    .diagnostico-fechar {
+        border: none;
+        background: none;
+        font-size: 1.75rem;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .diagnostico-form {
+        margin: 1rem 0 0.5rem;
+        label {
+            font: var(--font-heading4);
+        }
+    }
+
+    .diagnostico-form-linha {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        input {
+            flex: 1 1 14rem;
+            padding: 0.4rem 0.75rem;
+            border: 1px solid #bbb;
+            border-radius: 30px;
+        }
+    }
+
+    .diagnostico-btn {
+        padding: 0.4rem 1.25rem;
+        border: none;
+        border-radius: 30px;
+        cursor: pointer;
+        font: var(--font-button2);
+        background-color: var(--primary);
+        color: var(--general-white);
+        margin-top: 0.75rem;
+        &:hover:not(:disabled) {
+            background-color: var(--primary-dark);
+        }
+        &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    }
+
+    .diagnostico-form .diagnostico-btn {
+        margin-top: 0;
+    }
+
+    .diagnostico-abas {
+        display: flex;
+        gap: 0.25rem;
+        border-bottom: 2px solid var(--primary);
+        margin: 0.75rem 0;
+        button {
+            border: none;
+            background: none;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            font: var(--font-button2);
+            border-radius: 0.5rem 0.5rem 0 0;
+        }
+        button[aria-selected="true"] {
+            background-color: var(--primary);
+            color: var(--general-white);
+        }
+    }
+
+    h3 {
+        font: var(--font-heading3);
+        margin: 1rem 0 0.5rem;
+    }
+
+    .diagnostico-dados {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 0.25rem 1rem;
+        dt {
+            font-weight: 600;
+        }
+        dd {
+            margin: 0;
+        }
+    }
+
+    .diagnostico-tabela {
+        width: 100%;
+        border-collapse: collapse;
+        th,
+        td {
+            border-bottom: 1px solid #ddd;
+            padding: 0.35rem 0.5rem;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background: #f3f3f3;
+        }
+    }
+
+    .diagnostico-aviso,
+    .diagnostico-alerta,
+    .diagnostico-dica {
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.5rem;
+        margin: 0.5rem 0;
+    }
+    .diagnostico-aviso {
+        background: #fff6db;
+    }
+    .diagnostico-alerta {
+        background: #fde4e4;
+    }
+    .diagnostico-dica {
+        background: var(--primary-light);
+    }
+
+    .diagnostico-sim {
+        color: #1b7f3a;
+        font-weight: 600;
+    }
+    .diagnostico-nao {
+        color: #b3261e;
+        font-weight: 600;
+    }
+
+    .diagnostico-regra {
+        display: block;
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: #f6f6f6;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+    }
+
+    .diagnostico-condicoes {
+        margin: 0.25rem 0;
+        padding-left: 1rem;
+        list-style: none;
+        font-family: monospace;
+    }
+
+    .diagnostico-contexto pre {
+        white-space: pre-wrap;
+        background: #f6f6f6;
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+    }
+}

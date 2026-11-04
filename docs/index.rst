@@ -18,6 +18,7 @@ Guia de Navegação
    :caption: Seções do Projeto:
 
    instalacao-e-testes
+   diagnostico
    nova-api
    plano-apiv2
    evolucao-do-design

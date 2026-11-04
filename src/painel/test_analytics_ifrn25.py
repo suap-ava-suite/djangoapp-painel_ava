@@ -91,6 +91,14 @@ EVENTOS_PLANEJADOS = [
     "popup_fechar",
     "aviso_modal_exibir",
     "erro_rede_dialogo_exibir",
+    "diagnostico_abrir",
+    "diagnostico_consultar",
+    "diagnostico_aba",
+    "diagnostico_autoinscricao",
+    "diagnostico_personificar",
+    "diagnostico_personificar_bloqueado",
+    "diagnostico_erro",
+    "diagnostico_fechar",
 ]
 
 

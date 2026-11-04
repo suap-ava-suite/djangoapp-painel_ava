@@ -48,10 +48,11 @@ STRING_LITERAL = re.compile(r"'(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"")
 class MoodleIndisponivel(Exception):
     """Falha ao consultar o Moodle, com o status já classificado."""
 
-    def __init__(self, status: str, mensagem: str):
+    def __init__(self, status: str, mensagem: str, detalhe: str = ""):
         super().__init__(mensagem)
         self.status = status
         self.mensagem = mensagem
+        self.detalhe = detalhe
 
 
 def somente_superusuario(view: Callable) -> Callable:
@@ -82,9 +83,13 @@ def _chamar_moodle(ava: Ambiente, servico: str, **params: Any) -> Any:
             mensagem = f"HTTP {status}"
         if status == 404 and mensagem == MOODLE_SERVICO_INEXISTENTE:
             raise MoodleIndisponivel(STATUS_ENDPOINT_INDISPONIVEL, "Atualize o tool_painelava deste Moodle.")
-        raise MoodleIndisponivel(STATUS_ERRO, f"HTTP {status}: {mensagem}")
+        raise MoodleIndisponivel(STATUS_ERRO, f"O Moodle respondeu com erro HTTP {status}.", mensagem)
+    except requests.exceptions.Timeout as e:
+        raise MoodleIndisponivel(STATUS_ERRO, "O Moodle não respondeu a tempo.", f"{type(e).__name__}: {e}")
+    except requests.exceptions.ConnectionError as e:
+        raise MoodleIndisponivel(STATUS_ERRO, "Não foi possível conectar ao Moodle.", f"{type(e).__name__}: {e}")
     except (requests.exceptions.RequestException, ValueError) as e:
-        raise MoodleIndisponivel(STATUS_ERRO, f"{type(e).__name__}: {e}")
+        raise MoodleIndisponivel(STATUS_ERRO, "Resposta inválida do Moodle.", f"{type(e).__name__}: {e}")
 
 
 def _ambiente_json(ava: Ambiente) -> dict:
@@ -101,11 +106,11 @@ def _em_paralelo(funcao: Callable[[Ambiente], dict]) -> List[dict]:
 
 
 def _diagnostico_moodle(ava: Ambiente, username: str) -> dict:
-    resultado = {"ambiente": _ambiente_json(ava), "status": STATUS_OK, "mensagem": "", "dados": None}
+    resultado = {"ambiente": _ambiente_json(ava), "status": STATUS_OK, "mensagem": "", "detalhe": "", "dados": None}
     try:
         dados = _chamar_moodle(ava, SERVICO_DIAGNOSTICO, username=username)
     except MoodleIndisponivel as e:
-        resultado.update(status=e.status, mensagem=e.mensagem)
+        resultado.update(status=e.status, mensagem=e.mensagem, detalhe=e.detalhe)
         return resultado
     if not isinstance(dados, dict):
         resultado.update(status=STATUS_ERRO, mensagem="Resposta inesperada do Moodle.")
@@ -352,7 +357,7 @@ def _cursos_autoinscricao(ava: Ambiente, username: str) -> dict:
             item["cursos"] = (dados.get("autoinscricoes") or []) if isinstance(dados, dict) else []
             return item
         except MoodleIndisponivel as e:
-            item.update(status=e.status, mensagem=e.mensagem)
+            item.update(status=e.status, mensagem=e.mensagem, detalhe=e.detalhe)
     item["fonte"] = None
     item["cursos"] = []
     return item

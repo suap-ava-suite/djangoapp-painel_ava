@@ -163,6 +163,9 @@ def test_usuario_sem_conta_e_erro_de_rede(usuarios, ambientes):
         dados = _cliente(admin).get("/diagnostico/20261234/usuario/").json()
     status = {a["ambiente"]["id"]: a["status"] for a in dados["ambientes"]}
     assert status == {a0.id: "sem_conta", a1.id: "erro"}
+    falha = next(a for a in dados["ambientes"] if a["ambiente"]["id"] == a1.id)
+    assert falha["mensagem"] == "O Moodle não respondeu a tempo."
+    assert "ConnectTimeout" in falha["detalhe"]
 
 
 def test_erro_http_generico_do_moodle(usuarios, ambientes):
@@ -177,7 +180,8 @@ def test_erro_http_generico_do_moodle(usuarios, ambientes):
         dados = _cliente(admin).get("/diagnostico/20261234/usuario/").json()
     por_ambiente = {a["ambiente"]["id"]: a for a in dados["ambientes"]}
     assert por_ambiente[a0.id]["status"] == "erro"
-    assert "Unauthorized" in por_ambiente[a0.id]["mensagem"]
+    assert por_ambiente[a0.id]["mensagem"] == "O Moodle respondeu com erro HTTP 401."
+    assert por_ambiente[a0.id]["detalhe"] == "Unauthorized"
     assert por_ambiente[a1.id]["status"] == "erro"
 
 

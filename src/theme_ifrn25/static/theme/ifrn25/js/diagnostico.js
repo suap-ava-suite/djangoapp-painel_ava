@@ -87,6 +87,17 @@
             }
             return no;
         };
+        const falha = (texto, detalhe) => {
+            const bloco = el('div', null, 'diagnostico-alerta');
+            bloco.appendChild(el('p', texto));
+            if (detalhe) {
+                const mais = el('details');
+                mais.appendChild(el('summary', 'Detalhe técnico'));
+                mais.appendChild(el('code', detalhe));
+                bloco.appendChild(mais);
+            }
+            return bloco;
+        };
         const tabela = (cabecalhos, linhas) => {
             const t = el('table', null, 'diagnostico-tabela');
             const thead = t.createTHead().insertRow();
@@ -204,7 +215,7 @@
                     ['Ambiente', 'Situação', 'Conta suspensa', 'Último acesso', 'Inscrições ativas', 'Inscrições suspensas'],
                     dados.ambientes.map((a) => [
                         a.ambiente.nome,
-                        STATUS_AMBIENTE[a.status] || a.status,
+                        a.mensagem ? `${STATUS_AMBIENTE[a.status] || a.status}: ${a.mensagem}` : STATUS_AMBIENTE[a.status] || a.status,
                         a.conta ? (a.conta.suspended ? 'sim' : 'não') : '—',
                         a.conta ? formatarData(a.conta.lastaccess) : '—',
                         a.inscricoes ? a.inscricoes.active : '—',
@@ -278,7 +289,7 @@
                 if (a.status === 'endpoint_indisponivel' && a.fonte) {
                     painelAutoinscricao.appendChild(el('p', 'Endpoint de diagnóstico indisponível: cursos ocultos e inscrições suspensas não aparecem.', 'diagnostico-aviso'));
                 } else if (!a.fonte) {
-                    painelAutoinscricao.appendChild(el('p', `${STATUS_AMBIENTE[a.status] || a.status}: ${a.mensagem}`, 'diagnostico-alerta'));
+                    painelAutoinscricao.appendChild(falha(`${STATUS_AMBIENTE[a.status] || a.status}. ${a.mensagem}`, a.detalhe));
                     return;
                 }
                 if (!a.cursos.length) {

@@ -59,3 +59,28 @@ def test_tour_comeca_pendente_e_fica_concluido(cliente_com_perfil):
     perfil.refresh_from_db()
     assert perfil.settings["tour"]["completed"] is True
     assert client.get("/get_tour_status/").json() == {"completed_tour": True}
+
+
+def test_popup_cached_busca_no_banco_quando_o_cache_esta_vazio(db, settings):
+    """Garante a cobertura de Popup.cached() independentemente do que sobrou no cache entre execuções."""
+    from datetime import timedelta
+
+    from django.core.cache import cache
+    from django.utils.timezone import now
+
+    from painel.models import Popup
+
+    settings.CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+    cache.clear()
+    popup = Popup.objects.create(
+        titulo="Aviso",
+        url="https://exemplo.test/",
+        mensagem="m",
+        start_at=now() - timedelta(days=1),
+        end_at=now() + timedelta(days=1),
+    )
+    cache.delete("popups")
+
+    assert Popup.cached() == [popup]
+    assert cache.get("popups") == [popup]
+    cache.clear()

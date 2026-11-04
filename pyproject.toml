@@ -1,6 +1,6 @@
 [project]
 name = "painel-ava"
-version = "1.1.075"
+version = "1.1.076"
 description = "Painel do AVA: portal do IFRN que reúne os diários e cursos do usuário nos ambientes Moodle."
 readme = "README.md"
 license = { file = "LICENSE.md" }
@@ -15,7 +15,7 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
-    "avaintegration-metapackage==6.0.8.47",
+    "avaintegration-metapackage==6.0.8.48",
 ]
 
 [project.optional-dependencies]

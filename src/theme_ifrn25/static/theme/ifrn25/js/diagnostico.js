@@ -289,7 +289,7 @@
 
         const tabelaComparacoes = (detalhes, matriculas) => {
             const esperado = (l) => `${l.operador} ${l.esperado}`.trim();
-            if (detalhes.tipo !== 'por_vinculo') {
+            if (detalhes.tipo !== 'por_item') {
                 return tabela(
                     ['Campo', 'Esperado', 'Usuário'],
                     detalhes.linhas.map((l) => [l.rotulo, esperado(l), celulaValor(l.sensivel ? '(oculto)' : l.valor, l.atendido, l.erro)])

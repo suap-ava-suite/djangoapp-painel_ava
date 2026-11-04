@@ -8,15 +8,15 @@ import logging
 import re
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
-from decimal import Decimal
 from functools import wraps
 from http.client import HTTPException
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional
 
 import requests
 from django.contrib.auth import get_user_model
 from django.http import HttpRequest, JsonResponse
 from django.views.decorators.http import require_GET
+from django_rule_engine.explain import explain
 from django_suap_auth.impersonation.helpers import is_impersonating
 
 from painel.models import Ambiente
@@ -43,12 +43,6 @@ STATUS_ERRO = "erro"
 CAMPOS_SENSIVEIS = re.compile(r"cpf|rg|passaporte|email|e_mail|nascimento|telefone|filiacao|foto|endereco|senha")
 CAMPOS_MATRICULA_EXIBIDOS = ("tipo", "campus", "curso", "modalidade", "nivel_ensino", "categoria", "cargo", "ativo")
 MATRICULA_INDICE_ZERO = "outras_matriculas[0]"
-NOT_IN = re.compile(r"not\s+in\b")
-OPERADORES_SIMBOLICOS = ("==", "!=", ">=", "<=", "=~~", "!~~", "=~", "!~", ">", "<")
-CHAVE_ENTRE_COLCHETES = re.compile(r"\[\s*'([^']*)'\s*\]|\[\s*\"([^\"]*)\"\s*\]")
-COMPREENSAO_MATRICULAS = re.compile(
-    r"^\$(?P<func>any|all)\(\s*\[(?P<expr>.*)\s+for\s+(?P<var>\w+)\s+in\s+(?P<iter>outras_matriculas)\s*\]\s*\)$", re.S
-)
 STRING_LITERAL = re.compile(r"'(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"")
 
 
@@ -213,207 +207,6 @@ def diagnostico_usuario(request: HttpRequest, username: str) -> JsonResponse:
 # --- Autoinscrição ---------------------------------------------------------------------------------------------
 
 
-def _dividir_condicoes(regra: str) -> List[str]:
-    """Divide a regra nos ``and``/``or`` de nível superior, se todos forem do mesmo operador.
-
-    Devolve ``[]`` quando não há divisão confiável (operadores misturados, uma só condição ou sintaxe inesperada).
-    """
-    texto = regra.strip()
-    while texto.startswith("(") and texto.endswith(")") and _fecha_no_final(texto):
-        texto = texto[1:-1].strip()
-
-    partes, operadores, profundidade, inicio, i = [], set(), 0, 0, 0
-    aspas = None
-    while i < len(texto):
-        c = texto[i]
-        if aspas:
-            if c == "\\":
-                i += 2
-                continue
-            if c == aspas:
-                aspas = None
-        elif c in "'\"":
-            aspas = c
-        elif c in "([{":
-            profundidade += 1
-        elif c in ")]}":
-            profundidade -= 1
-        elif profundidade == 0:
-            for op in ("and", "or"):
-                fim = i + len(op)
-                antes_ok = i == 0 or not (texto[i - 1].isalnum() or texto[i - 1] == "_")
-                depois_ok = fim < len(texto) and not (texto[fim].isalnum() or texto[fim] == "_")
-                if texto.startswith(op, i) and antes_ok and depois_ok:
-                    partes.append(texto[inicio:i].strip())
-                    operadores.add(op)
-                    inicio = fim
-                    i = fim - 1
-                    break
-        i += 1
-    partes.append(texto[inicio:].strip())
-
-    if len(operadores) != 1 or len(partes) < 2 or not all(partes):
-        return []
-    return partes
-
-
-def _fecha_no_final(texto: str) -> bool:
-    """O parêntese de abertura do início só fecha no último caractere?"""
-    profundidade, aspas = 0, None
-    for i, c in enumerate(texto):
-        if aspas:
-            if c == aspas:
-                aspas = None
-            continue
-        if c in "'\"":
-            aspas = c
-        elif c == "(":
-            profundidade += 1
-        elif c == ")":
-            profundidade -= 1
-            if profundidade == 0 and i != len(texto) - 1:
-                return False
-    return True
-
-
-def _avaliar_condicao(condicao: str, contexto: dict) -> dict:
-    try:
-        resultado, erro = bool(get_compiled_rule(condicao).matches(contexto)), ""
-    except Exception as e:
-        resultado, erro = None, f"{type(e).__name__}: {e}"
-    return {
-        "condicao": condicao,
-        "resultado": resultado,
-        "erro": erro,
-        "detalhes": _detalhar_condicao(condicao, contexto),
-    }
-
-
-def _mascara_topo(texto: str) -> List[bool]:
-    """Para cada posição: está fora de aspas e de parênteses/colchetes/chaves?"""
-    mascara, profundidade, aspas, escapar = [], 0, None, False
-    for c in texto:
-        if aspas:
-            mascara.append(False)
-            if escapar:
-                escapar = False
-            elif c == "\\":
-                escapar = True
-            elif c == aspas:
-                aspas = None
-            continue
-        if c in "'\"":
-            aspas = c
-        elif c in "([{":
-            profundidade += 1
-        elif c in ")]}":
-            profundidade -= 1
-        mascara.append(profundidade == 0 and not aspas and c not in ")]}")
-    return mascara
-
-
-def _palavra_em(texto: str, i: int, palavra: str) -> bool:
-    fim = i + len(palavra)
-    return (
-        texto.startswith(palavra, i)
-        and (i == 0 or not (texto[i - 1].isalnum() or texto[i - 1] == "_"))
-        and (fim >= len(texto) or not (texto[fim].isalnum() or texto[fim] == "_"))
-    )
-
-
-def _dividir_comparacao(atomo: str) -> Optional[Tuple[str, str, str]]:
-    """``campo op esperado`` no primeiro operador de comparação de nível superior; ``None`` se não houver."""
-    mascara = _mascara_topo(atomo)
-    for i in range(len(atomo)):
-        if not mascara[i]:
-            continue
-        for op in OPERADORES_SIMBOLICOS:
-            if atomo.startswith(op, i):
-                return atomo[:i].strip(), op, atomo[i + len(op) :].strip()
-        nao_em = NOT_IN.match(atomo, i) if _palavra_em(atomo, i, "not") else None
-        if nao_em:
-            return atomo[:i].strip(), "not in", atomo[nao_em.end() :].strip()
-        if _palavra_em(atomo, i, "in") and i > 0:
-            return atomo[:i].strip(), "in", atomo[i + 2 :].strip()
-    return None
-
-
-def _jsonavel(valor: Any) -> Any:
-    if isinstance(valor, Decimal):
-        return int(valor) if valor == valor.to_integral_value() else float(valor)
-    if isinstance(valor, (list, tuple)):
-        return [_jsonavel(v) for v in valor]
-    if isinstance(valor, dict):
-        return {str(k): _jsonavel(v) for k, v in valor.items()}
-    if valor is None or isinstance(valor, (str, int, float, bool)):
-        return valor
-    if hasattr(valor, "isoformat"):
-        return valor.isoformat()
-    return str(valor)
-
-
-def _valor_da_expressao(expressao: str, contexto: dict) -> Tuple[Any, str]:
-    try:
-        return _jsonavel(get_compiled_rule(expressao).evaluate(contexto)), ""
-    except Exception as e:
-        return None, f"{type(e).__name__}: {e}"
-
-
-def _rotulo_campo(campo: str, variavel: str = "") -> str:
-    """``m['detalhamento']['modalidade']`` vira ``detalhamento.modalidade``."""
-    rotulo = CHAVE_ENTRE_COLCHETES.sub(lambda c: "." + (c.group(1) if c.group(1) is not None else c.group(2)), campo)
-    if variavel and rotulo.startswith(variavel + "."):
-        rotulo = rotulo[len(variavel) + 1 :]
-    return rotulo
-
-
-def _linha_comparacao(atomo: str, variavel: str = "") -> dict:
-    comparacao = _dividir_comparacao(atomo)
-    campo, operador, esperado = comparacao if comparacao else (atomo, "", "verdadeiro")
-    return {
-        "atomo": atomo,
-        "campo": campo,
-        "rotulo": _rotulo_campo(campo, variavel),
-        "operador": operador,
-        "esperado": esperado,
-        "sensivel": bool(CAMPOS_SENSIVEIS.search(campo)),
-    }
-
-
-def _detalhar_condicao(condicao: str, contexto: dict) -> dict:
-    """Campo, valor esperado e valor do usuário de cada comparação (por vínculo em ``$any``/``$all``)."""
-    texto = condicao.strip()
-    while texto.startswith("(") and texto.endswith(")") and _fecha_no_final(texto):
-        texto = texto[1:-1].strip()
-
-    compreensao = COMPREENSAO_MATRICULAS.match(texto)
-    if compreensao:
-        variavel, iteravel = compreensao.group("var"), compreensao.group("iter")
-        linhas = []
-        for atomo in _dividir_condicoes(compreensao.group("expr")) or [compreensao.group("expr").strip()]:
-            linha = _linha_comparacao(atomo, variavel)
-            valores, erro = (None, "")
-            if not linha["sensivel"]:
-                valores, erro = _valor_da_expressao(f"[{linha['campo']} for {variavel} in {iteravel}]", contexto)
-            resultados, erro_resultado = _valor_da_expressao(f"[{atomo} for {variavel} in {iteravel}]", contexto)
-            atendido = None
-            if isinstance(resultados, list):
-                atendido = any(resultados) if compreensao.group("func") == "any" else all(resultados)
-            linha.update(valores=valores, resultados=resultados, atendido=atendido, erro=erro or erro_resultado)
-            linhas.append(linha)
-        return {"tipo": "por_vinculo", "funcao": compreensao.group("func"), "linhas": linhas}
-
-    linhas = []
-    for atomo in _dividir_condicoes(texto) or [texto]:
-        linha = _linha_comparacao(atomo)
-        valor, erro = (None, "") if linha["sensivel"] else _valor_da_expressao(linha["campo"], contexto)
-        resultado, erro_resultado = _valor_da_expressao(atomo, contexto)
-        atendido = resultado if isinstance(resultado, bool) else None
-        linha.update(valor=valor, resultado=resultado, atendido=atendido, erro=erro or erro_resultado)
-        linhas.append(linha)
-    return {"tipo": "simples", "linhas": linhas}
-
-
 def _indices_que_atenderiam(regra: str, contexto: dict) -> List[int]:
     """Se a regra usa ``outras_matriculas[0]``, em quais vínculos (índices) ela passaria."""
     if MATRICULA_INDICE_ZERO not in regra:
@@ -460,7 +253,7 @@ def _avaliar_curso(curso: dict, usuario, contexto: dict) -> dict:
     condicoes = []
     indices = []
     if usuario and regra and motivo != MOTIVO_OK:
-        condicoes = [_avaliar_condicao(c, contexto) for c in _dividir_condicoes(regra) or [regra]]
+        condicoes = explain(regra, contexto, sensitive=CAMPOS_SENSIVEIS)["condicoes"]
         indices = _indices_que_atenderiam(regra, contexto)
     return {
         "courseid": curso.get("courseid") or curso.get("id"),

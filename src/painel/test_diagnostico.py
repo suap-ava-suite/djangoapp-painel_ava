@@ -426,3 +426,84 @@ def test_parenteses_externos_que_nao_envolvem_tudo_nao_sao_removidos():
 def test_avaliar_condicao_com_erro():
     resultado = diagnostico._avaliar_condicao("chave_inexistente == 1", {})
     assert resultado["resultado"] is None and resultado["erro"]
+
+
+REGRA_EJA = (
+    "tipo_usuario in ['Aluno'] and $any([m['tipo'] == 'aluno' and m['detalhamento']['ativo'] == true "
+    "and m['detalhamento']['modalidade'] in ['Técnico integrado ao ensino médio EJA', 'Técnico subsequente'] "
+    "for m in outras_matriculas])"
+)
+CONTEXTO_EJA = {
+    "tipo_usuario": "Aluno",
+    "cpf": "000",
+    "outras_matriculas": [
+        {"tipo": "aluno", "detalhamento": {"ativo": True, "modalidade": "Técnico Integrado"}},
+        {"tipo": "Aluno", "detalhamento": {"ativo": False, "modalidade": "Técnico subsequente"}},
+    ],
+}
+
+
+def test_detalha_comparacoes_simples_e_por_vinculo():
+    simples, por_vinculo = [
+        diagnostico._avaliar_condicao(c, CONTEXTO_EJA) for c in diagnostico._dividir_condicoes(REGRA_EJA)
+    ]
+
+    linha = simples["detalhes"]["linhas"][0]
+    assert simples["detalhes"]["tipo"] == "simples"
+    assert (linha["rotulo"], linha["operador"], linha["esperado"]) == ("tipo_usuario", "in", "['Aluno']")
+    assert linha["valor"] == "Aluno" and linha["atendido"] is True
+
+    detalhes = por_vinculo["detalhes"]
+    assert detalhes["tipo"] == "por_vinculo" and detalhes["funcao"] == "any"
+    tipo, ativo, modalidade = detalhes["linhas"]
+    assert tipo["rotulo"] == "tipo" and tipo["valores"] == ["aluno", "Aluno"] and tipo["resultados"] == [True, False]
+    assert tipo["atendido"] is True
+    assert ativo["rotulo"] == "detalhamento.ativo" and ativo["valores"] == [True, False]
+    assert modalidade["valores"] == ["Técnico Integrado", "Técnico subsequente"]
+    assert modalidade["resultados"] == [False, True]
+    assert por_vinculo["resultado"] is False
+
+
+def test_detalha_regra_inteira_sem_and_or_e_campo_sensivel():
+    detalhes = diagnostico._avaliar_condicao("cpf == '123'", CONTEXTO_EJA)["detalhes"]
+    linha = detalhes["linhas"][0]
+    assert linha["sensivel"] is True and linha["valor"] is None and linha["atendido"] is False
+
+
+def test_detalha_all_e_expressao_sem_comparacao():
+    detalhes = diagnostico._detalhar_condicao(
+        "$all([m['detalhamento']['ativo'] for m in outras_matriculas])", CONTEXTO_EJA
+    )
+    linha = detalhes["linhas"][0]
+    assert detalhes["funcao"] == "all" and linha["operador"] == "" and linha["esperado"] == "verdadeiro"
+    assert linha["resultados"] == [True, False] and linha["atendido"] is False
+
+
+def test_detalha_erro_de_avaliacao():
+    linha = diagnostico._detalhar_condicao("chave_inexistente == 1", {})["linhas"][0]
+    assert linha["atendido"] is None and linha["erro"]
+
+
+@pytest.mark.parametrize(
+    "atomo,esperado",
+    [
+        ("a == 'x == y'", ("a", "==", "'x == y'")),
+        ("a not in ['b']", ("a", "not in", "['b']")),
+        ("a in ['in']", ("a", "in", "['in']")),
+        ("idade >= 18", ("idade", ">=", "18")),
+        ("nome =~ 'A.*'", ("nome", "=~", "'A.*'")),
+        ("ativo", None),
+        ("brincadeira", None),
+    ],
+)
+def test_dividir_comparacao(atomo, esperado):
+    assert diagnostico._dividir_comparacao(atomo) == esperado
+
+
+def test_jsonavel():
+    from datetime import date
+    from decimal import Decimal
+
+    assert diagnostico._jsonavel((Decimal("2"), Decimal("1.5"))) == [2, 1.5]
+    assert diagnostico._jsonavel({"d": date(2026, 1, 2)}) == {"d": "2026-01-02"}
+    assert diagnostico._jsonavel(object).startswith("<class")

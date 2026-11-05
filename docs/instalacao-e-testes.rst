@@ -86,13 +86,25 @@ O repositório possui workflows automatizados em ``.github/workflows/``:
 - **Build, Deploy e Sentry (``build-deploy.yml``)**:
 
   1. **Publicação de imagem Docker**: Constrói e publica a imagem multi-arquitetura no Docker Hub ao publicar uma
-     release/tag.
+     release/tag. O build recebe ``--build-arg APP_ENVIRONMENT``: ``test`` nas tags ``-test`` e ``production`` nas
+     demais.
   2. **Deploy automatizado**: Atualiza o ambiente de homologação (``test``, tags com sufixo ``-test`` via Helm) ou os
      servidores de produção (``production``, via Docker Compose).
   3. **Registro no Sentry**: Registra a release, associa os commits locais
      (``sentry-cli releases set-commits --local``), finaliza a versão e notifica o deploy no ambiente correspondente
      (``test`` ou ``production``) utilizando a secret ``SENTRY_AUTH_TOKEN`` e as variáveis ``SENTRY_URL``,
      ``SENTRY_ORG`` e ``SENTRY_PROJECT``.
+
+Versão e ambiente
+-----------------
+
+A versão existe só no ``pyproject.toml``: ``settings/project.py`` a lê com ``tomllib`` (``APP_VERSION``). A imagem
+copia o arquivo para ``/app/pyproject.toml``. Ao lançar uma versão, altere apenas o ``pyproject.toml``.
+
+O ambiente (``APP_ENVIRONMENT``) é ``local``, ``test`` ou ``production``. Vem do build-arg de mesmo nome, gravado como
+variável de ambiente na imagem; sem ele, ``local``. A release (``APP_RELEASE``) segue o nome da tag do git:
+``1.2.3`` em produção e ``1.2.3-test`` em teste. Versão e ambiente aparecem no modal de perfil (``ifrn25``) e no
+rodapé (``ifrn23``), e são o padrão do Sentry (``SENTRY_ENVIRONMENT`` e ``SENTRY_RELEASE`` ainda têm prioridade).
 
 Sentry no navegador (JavaScript)
 --------------------------------
@@ -102,9 +114,9 @@ são enviados ao Sentry **somente** se a variável ``SENTRY_JS_DSN`` estiver def
 independente de ``SENTRY_DNS`` (Django), então pode apontar para outro projeto do Sentry.
 
 - ``SENTRY_JS_DSN``: DSN do projeto JavaScript. Sem ela, o SDK não é carregado e nada é enviado.
-- ``SENTRY_JS_ENVIRONMENT``: ambiente (padrão: ``SENTRY_ENVIRONMENT`` ou ``local``).
+- ``SENTRY_JS_ENVIRONMENT``: ambiente (padrão: ``SENTRY_ENVIRONMENT`` ou ``APP_ENVIRONMENT``).
 - ``SENTRY_JS_SAMPLE_RATE``: porcentagem de erros reportados (padrão: ``100``).
-- ``SENTRY_RELEASE``: release (padrão: versão da aplicação).
+- ``SENTRY_RELEASE``: release (padrão: ``APP_RELEASE``, igual à tag do git).
 
 Erros originados em arquivos da pasta ``vendors`` são descartados.
 

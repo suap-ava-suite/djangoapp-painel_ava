@@ -114,6 +114,22 @@
         }
     }
 
+    a.diagnostico-btn {
+        display: inline-block;
+        text-decoration: none;
+    }
+
+    .diagnostico-link {
+        color: var(--primary);
+        text-decoration: underline;
+    }
+
+    .diagnostico-acoes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
     .diagnostico-form .diagnostico-btn {
         margin-top: 0;
     }

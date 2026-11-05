@@ -1,7 +1,7 @@
 from django.urls import path
 
 from .apps import PainelConfig
-from .diagnostico import diagnostico_autoinscricao, diagnostico_usuario
+from .diagnostico import diagnostico_autoinscricao, diagnostico_exportar, diagnostico_usuario
 from .views import (
     change_menu_position,
     change_theme,
@@ -29,4 +29,5 @@ urlpatterns = [
     path("get_tour_status/", get_tour_status, name="get_tour_status"),
     path("diagnostico/<str:username>/usuario/", diagnostico_usuario, name="diagnostico_usuario"),
     path("diagnostico/<str:username>/autoinscricao/", diagnostico_autoinscricao, name="diagnostico_autoinscricao"),
+    path("diagnostico/<str:username>/exportar/", diagnostico_exportar, name="diagnostico_exportar"),
 ]

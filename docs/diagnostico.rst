@@ -12,10 +12,12 @@ Na gaveta do usuário (tema ``ifrn25``), bloco **Admins**, item **Diagnosticar**
 rotas só existem para superusuários e ficam indisponíveis durante uma personificação (as rotas
 respondem ``409``). Para quem não é superusuário, as rotas respondem ``403``.
 
-Rotas (somente ``GET``, JSON):
+Rotas (somente ``GET``):
 
-- ``/diagnostico/<username>/usuario/``
-- ``/diagnostico/<username>/autoinscricao/``
+- ``/diagnostico/<username>/usuario/`` (JSON)
+- ``/diagnostico/<username>/autoinscricao/`` (JSON)
+- ``/diagnostico/<username>/exportar/`` (download do JSON de exportação; ``404`` se o usuário não existe
+  no Painel)
 
 Aba Personificar
 ================
@@ -23,17 +25,26 @@ Aba Personificar
 Mostra os dados do usuário no Painel (nome, e-mail mascarado, perfil, situação, último login) e os
 vínculos na mesma ordem de ``outras_matriculas``. Para cada ambiente Moodle ativo, informa se a conta
 existe, se está suspensa, o último acesso e a quantidade de cursos com inscrição ativa e suspensa.
+Quando a conta existe, **Ver conta** abre o perfil do usuário naquele Moodle (``/user/profile.php``),
+numa nova aba.
 
 O botão **Personificar** usa ``django_suap_auth`` e vale **só no Painel**: não personifica no Moodle
 nem no SUAP. Fica desabilitado quando o alvo é superusuário, é você mesmo, está inativo ou não existe
 no Painel (nunca fez login).
+
+Quando o usuário existe no Painel, ao lado de **Personificar** aparecem:
+
+- **Exportar**: baixa o mesmo JSON da ação *Exportar (JSON) com perfil, vínculos e dados brutos* do
+  admin de usuários (``django_suap_auth``), só com este usuário;
+- **Editar**: abre a tela de edição do usuário no admin, numa nova aba (issue #130).
 
 Aba Auto inscrição
 ==================
 
 Lista todos os cursos com ``restricoes_de_autoinscricao`` de cada ambiente, inclusive ocultos, numa
 tabela-resumo. O botão **Ver regra** de cada curso abre o detalhe num modal que ocupa 90% da tela
-(Esc fecha só esse modal). Para cada curso, informa:
+(Esc fecha só esse modal). O nome do curso é um link para a página dele no Moodle
+(``/course/view.php``), numa nova aba. Para cada curso, informa:
 
 - **Atende?** e o motivo: ``ok``, ``regra_falsa``, ``regra_vazia``, ``regra_invalida``,
   ``erro_avaliacao`` ou ``usuario_inexistente_painel``, com a mensagem de erro quando houver;
@@ -81,6 +92,14 @@ Nenhum evento leva username, nome, curso ou regra; só categorias e contagens.
      - ``cursos_total``, ``cursos_atende``, ``cursos_nao_atende``, ``motivo_principal``
    * - ``diagnostico_personificar``
      - ``permitido=sim``
+   * - ``diagnostico_exportar``
+     - —
+   * - ``diagnostico_editar``
+     - —
+   * - ``diagnostico_conta_abrir``
+     - —
+   * - ``diagnostico_curso_abrir``
+     - —
    * - ``diagnostico_personificar_bloqueado``
      - ``motivo`` (``alvo_superuser``, ``proprio_usuario``, ``inativo``, ``inexistente``)
    * - ``diagnostico_erro``

@@ -99,14 +99,14 @@ def _diag(exists=True, autoinscricoes=None):
 # --- Acesso -----------------------------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("rota", ["usuario", "autoinscricao"])
+@pytest.mark.parametrize("rota", ["usuario", "autoinscricao", "exportar"])
 def test_anonimo_e_usuario_comum_recebem_403(usuarios, rota):
     _, _, aluno = usuarios
     assert Client().get(f"/diagnostico/x/{rota}/").status_code == 403
     assert _cliente(aluno).get(f"/diagnostico/x/{rota}/").status_code == 403
 
 
-@pytest.mark.parametrize("rota", ["usuario", "autoinscricao"])
+@pytest.mark.parametrize("rota", ["usuario", "autoinscricao", "exportar"])
 def test_recusa_durante_personificacao(usuarios, rota):
     admin, _, _ = usuarios
     client = _cliente(admin)
@@ -148,7 +148,9 @@ def test_usuario_com_status_por_ambiente(usuarios, ambientes):
     por_ambiente = {a["ambiente"]["id"]: a for a in dados["ambientes"]}
     assert por_ambiente[a0.id]["status"] == "ok"
     assert por_ambiente[a0.id]["inscricoes"] == {"active": 3, "suspended": 1, "total": 4}
+    assert por_ambiente[a0.id]["conta"]["url"] == "https://moodle-0.invalid/user/profile.php?id=7"
     assert por_ambiente[a1.id]["status"] == "endpoint_indisponivel"
+    assert por_ambiente[a1.id]["conta"] is None
 
 
 def test_usuario_sem_conta_e_erro_de_rede(usuarios, ambientes):
@@ -208,6 +210,39 @@ def test_personificacao_bloqueada_para_inativo(usuarios, ambientes):
     assert dados["motivo_bloqueio"] == "inativo"
 
 
+def test_usuario_traz_link_de_edicao_no_admin(usuarios, ambientes):
+    admin, _, aluno = usuarios
+    Ambiente.objects.update(active=False)
+    cache.clear()
+    dados = _cliente(admin).get("/diagnostico/20261234/usuario/").json()
+    assert (
+        dados["usuario"]["url_editar"] == f"/admin/{aluno._meta.app_label}/{aluno._meta.model_name}/{aluno.pk}/change/"
+    )
+
+
+def test_exportar_baixa_o_mesmo_json_do_admin(usuarios):
+    admin, _, _ = usuarios
+    resposta = _cliente(admin).get("/diagnostico/20261234/exportar/")
+    assert resposta.status_code == 200
+    assert resposta["Content-Type"].startswith("application/json")
+    assert resposta["Content-Disposition"].startswith('attachment; filename="usuarios-suap-20261234-')
+    payload = json.loads(resposta.content)
+    assert payload["formato"]
+    assert [u["user"]["username"] for u in payload["usuarios"]] == ["20261234"]
+
+
+def test_exportar_usuario_inexistente(usuarios):
+    admin, _, _ = usuarios
+    resposta = _cliente(admin).get("/diagnostico/inexistente/exportar/")
+    assert resposta.status_code == 404
+    assert resposta.json() == {"error": "O usuário não existe no Painel."}
+
+
+def test_exportar_nao_aceita_post(usuarios):
+    admin, _, _ = usuarios
+    assert _cliente(admin).post("/diagnostico/20261234/exportar/").status_code == 405
+
+
 # --- Aba Auto inscrição -----------------------------------------------------------------------------------------
 
 
@@ -261,6 +296,7 @@ def test_autoinscricao_explica_por_que_nao_atende(usuarios, ambientes):
 
     assert c[1]["atende"] is True and c[1]["motivo"] == MOTIVO_OK and c[1]["inscricao"] == "ativa"
     assert c[1]["aparece_no_painel"] is True
+    assert c[1]["url"] == "https://moodle-0.invalid/course/view.php?id=1"
 
     assert c[2]["atende"] is False and c[2]["motivo"] == MOTIVO_REGRA_FALSA
     assert [x["atendido"] for x in c[2]["arvore"]["raiz"]["filhos"]] == [True, False]
@@ -273,6 +309,7 @@ def test_autoinscricao_explica_por_que_nao_atende(usuarios, ambientes):
 
     assert por_ambiente[a1.id]["fonte"] == "get_diarios"
     assert por_ambiente[a1.id]["cursos"][0]["courseid"] == 9
+    assert por_ambiente[a1.id]["cursos"][0]["url"] == "https://moodle-1.invalid/course/view.php?id=9"
     assert por_ambiente[a1.id]["cursos"][0]["inscricao"] == "ativa"
     assert [m["campus"] for m in dados["contexto"]["matriculas"]] == ["CNAT", "ZN"]
 
@@ -347,6 +384,7 @@ def test_menu_e_modal_so_para_superusuario(usuarios):
     html_admin = render_to_string(foot, {**ctx, "user": admin})
     assert 'id="diagnostico-modal"' in html_admin and "js/diagnostico.js" in html_admin
     assert "/diagnostico/__username__/usuario/" in html_admin
+    assert "/diagnostico/__username__/exportar/" in html_admin
     html_aluno = render_to_string(foot, {**ctx, "user": aluno})
     assert "diagnostico-modal" not in html_aluno and "diagnostico.js" not in html_aluno
     html_personificando = render_to_string(foot, {**ctx, "user": admin, "personificando": True})
@@ -395,6 +433,14 @@ def test_chamar_moodle_classifica_falhas(ambientes, falha, mensagem, detalhe):
     assert detalhe in erro.value.detalhe
 
 
+@pytest.mark.parametrize(
+    "id_moodle,esperado",
+    [(5, "https://m.test/x.php?id=5"), ("5", "https://m.test/x.php?id=5"), (None, None), ("1&a=b", None)],
+)
+def test_url_moodle_so_aceita_id_inteiro(id_moodle, esperado):
+    assert diagnostico._url_moodle("https://m.test", "x.php", id_moodle) == esperado
+
+
 @pytest.mark.parametrize("email,esperado", [("", ""), (None, ""), ("sem-arroba", ""), ("ab@x.test", "ab***@x.test")])
 def test_mascarar_email(email, esperado):
     assert diagnostico._mascarar_email(email) == esperado
@@ -421,7 +467,7 @@ def _curso(regra):
 
 def test_avaliar_curso_usa_explain_tree_da_django_rule_engine(usuarios):
     _, _, aluno = usuarios
-    curso = diagnostico._avaliar_curso(_curso(REGRA_EJA), aluno, CONTEXTO_EJA)
+    curso = diagnostico._avaliar_curso(_curso(REGRA_EJA), aluno, CONTEXTO_EJA, "https://moodle.invalid")
 
     arvore = curso["arvore"]
     assert arvore["atendido"] is False
@@ -449,7 +495,9 @@ def test_rotulo_dos_vinculos_usa_campus_e_curso_sem_identificador(usuarios):
             {"identificador": "20250000000002", "tipo": "aluno", "detalhamento": {"curso": "FIC"}},
         ],
     }
-    curso = diagnostico._avaliar_curso(_curso("$any([m['tipo'] == 'x' for m in outras_matriculas])"), aluno, contexto)
+    curso = diagnostico._avaliar_curso(
+        _curso("$any([m['tipo'] == 'x' for m in outras_matriculas])"), aluno, contexto, "https://moodle.invalid"
+    )
     itens = curso["arvore"]["raiz"]["argumentos"][0]["itens"]
     assert [i["rotulo"] for i in itens] == ["ZN · Eletrônica", "FIC"]
     assert diagnostico._rotulo_matricula("x") == ""
@@ -457,7 +505,7 @@ def test_rotulo_dos_vinculos_usa_campus_e_curso_sem_identificador(usuarios):
 
 def test_avaliar_curso_oculta_campos_sensiveis_do_painel(usuarios):
     _, _, aluno = usuarios
-    curso = diagnostico._avaliar_curso(_curso("cpf == '123'"), aluno, CONTEXTO_EJA)
+    curso = diagnostico._avaliar_curso(_curso("cpf == '123'"), aluno, CONTEXTO_EJA, "https://moodle.invalid")
     lado = curso["arvore"]["raiz"]["esquerda"]
     assert lado["sensivel"] is True and lado["valor"] is None
     assert curso["arvore"]["raiz"]["atendido"] is False
@@ -465,5 +513,5 @@ def test_avaliar_curso_oculta_campos_sensiveis_do_painel(usuarios):
 
 def test_avaliar_curso_que_atende_nao_detalha(usuarios):
     _, _, aluno = usuarios
-    curso = diagnostico._avaliar_curso(_curso("tipo_usuario == 'Aluno'"), aluno, CONTEXTO_EJA)
+    curso = diagnostico._avaliar_curso(_curso("tipo_usuario == 'Aluno'"), aluno, CONTEXTO_EJA, "https://moodle.invalid")
     assert curso["atende"] is True and curso["arvore"] is None

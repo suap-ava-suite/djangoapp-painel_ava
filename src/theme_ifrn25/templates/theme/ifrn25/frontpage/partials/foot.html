@@ -3,6 +3,11 @@
 {% include 'theme/ifrn25/frontpage/partials/modals/aviso-modal.html' %}
 {% include 'theme/ifrn25/frontpage/partials/modals/popup-admin.html' %}
 <script src="{% static 'theme/ifrn25/js/popup-admin.js' %}?last_startup={{ last_startup }}"></script>
+{% include 'theme/ifrn25/frontpage/partials/modals/diagnostico-modal.html' %}
+{% if user.is_superuser and not personificando %}
+  <script src="{% static 'rule_widget/rule_blocks.js' %}?last_startup={{ last_startup }}"></script>
+  <script src="{% static 'theme/ifrn25/js/diagnostico.js' %}?last_startup={{ last_startup }}"></script>
+{% endif %}
 <script type="module" src="{% static 'theme/ifrn25/js/app.js' %}?last_startup={{ last_startup }}"></script>
 
 <div vw class="enabled">

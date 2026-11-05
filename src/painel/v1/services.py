@@ -6,7 +6,7 @@ import time
 import urllib.parse
 from functools import lru_cache
 from http.client import HTTPException
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import requests
 import rule_engine
@@ -168,31 +168,47 @@ def contexto_para_log(contexto: Union[dict, None]) -> dict:
     return resumo
 
 
-def check_autoinscricao(regra: str, usuario_db, contexto: Union[dict, None] = None) -> bool:
-    if not regra or not str(regra).strip() or not usuario_db:
-        return False
+# Motivos do veredito da autoinscrição (usados pelo diagnóstico do superusuário)
+MOTIVO_OK = "ok"
+MOTIVO_REGRA_VAZIA = "regra_vazia"
+MOTIVO_USUARIO_INEXISTENTE = "usuario_inexistente_painel"
+MOTIVO_REGRA_INVALIDA = "regra_invalida"
+MOTIVO_ERRO_AVALIACAO = "erro_avaliacao"
+MOTIVO_REGRA_FALSA = "regra_falsa"
+
+
+def avaliar_autoinscricao(regra: str, usuario_db, contexto: Union[dict, None] = None) -> Tuple[bool, str, str]:
+    """Avalia a regra para o usuário e devolve (atende, motivo, detalhe do erro)."""
+    if not regra or not str(regra).strip():
+        return False, MOTIVO_REGRA_VAZIA, ""
+    if not usuario_db:
+        return False, MOTIVO_USUARIO_INEXISTENTE, ""
 
     try:
         rule = get_compiled_rule(regra)
     except Exception as e:
         logger.error(f"Regra inválida: {e}. {regra}")
-        return False
+        return False, MOTIVO_REGRA_INVALIDA, type(e).__name__
 
     if contexto is None:
         contexto = get_user_context(usuario_db)
+    username = getattr(usuario_db, "username", "unknown")
     try:
-        resultado = rule.matches(contexto)
-        username = getattr(usuario_db, "username", "unknown")
-        sucesso = "PASSOU" if resultado else "FOI BLOQUEADO"
-        logger.debug(f'Usuário {username} {sucesso} na regra "{regra}". Contexto: {contexto_para_log(contexto)}')
-        return resultado
+        resultado = bool(rule.matches(contexto))
     except Exception as e:
-        username = getattr(usuario_db, "username", "unknown")
         # Só log (warning não vira evento: event_level=ERROR). Enviar ao Sentry custava ~23 mil eventos (#116)
         logger.warning(
             f'Erro ao avaliar para {username} a regra "{regra}". Erro: {e}. Contexto: {contexto_para_log(contexto)}'
         )
-        return False
+        return False, MOTIVO_ERRO_AVALIACAO, type(e).__name__
+
+    sucesso = "PASSOU" if resultado else "FOI BLOQUEADO"
+    logger.debug(f'Usuário {username} {sucesso} na regra "{regra}". Contexto: {contexto_para_log(contexto)}')
+    return resultado, MOTIVO_OK if resultado else MOTIVO_REGRA_FALSA, ""
+
+
+def check_autoinscricao(regra: str, usuario_db, contexto: Union[dict, None] = None) -> bool:
+    return avaliar_autoinscricao(regra, usuario_db, contexto)[0]
 
 
 def _filtrar_autoinscricoes(autoinscricoes: list, usuario_db) -> list:

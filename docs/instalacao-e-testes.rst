@@ -142,6 +142,11 @@ matrícula ou texto de busca:
 - Links: ``ajuda_link_clicar``, ``perfil_link_clicar``, ``tema_trocar``, ``ambiente_acessar``, ``logout``.
 - Tour e avisos: ``tour_iniciar``, ``tour_passo``, ``tour_concluir``, ``popup_exibir``, ``popup_fechar``,
   ``aviso_modal_exibir``, ``erro_rede_dialogo_exibir``.
+- Diagnóstico (superusuário, issue #128): ``diagnostico_abrir``, ``diagnostico_consultar``,
+  ``diagnostico_aba``, ``diagnostico_autoinscricao``, ``diagnostico_personificar``,
+  ``diagnostico_personificar_bloqueado``, ``diagnostico_erro``, ``diagnostico_fechar``,
+  ``diagnostico_regra_abrir`` e
+  ``perfil_link_clicar`` com ``destino=diagnosticar``. Ver :doc:`diagnostico`.
 
 O evento ``tour_abandonar`` não existe: a biblioteca do tour (WebTour) só expõe ``onNext`` e ``onPrevious``,
 sem callback de fechamento.

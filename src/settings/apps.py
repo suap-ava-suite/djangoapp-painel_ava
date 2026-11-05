@@ -70,7 +70,9 @@ DJANGO_APPS = env_as_list(
         "django.contrib.staticfiles",
     ],
 )
-INSTALLED_APPS = MY_APPS + THIRD_APPS + DJANGO_APPS + ["dsgovbr"]
+# django_rule_engine fica fora das listas configuráveis por ambiente: o Diagnosticar usa os
+# estáticos dela (rule_blocks.js/css), então precisa estar sempre instalada.
+INSTALLED_APPS = MY_APPS + THIRD_APPS + DJANGO_APPS + ["dsgovbr", "django_rule_engine"]
 
 
 SITE_ID = 1

@@ -6,6 +6,7 @@
          aria-labelledby="diagnostico-titulo"
          data-url-usuario="{% url 'painel:diagnostico_usuario' username='__username__' %}"
          data-url-autoinscricao="{% url 'painel:diagnostico_autoinscricao' username='__username__' %}"
+         data-url-exportar="{% url 'painel:diagnostico_exportar' username='__username__' %}"
          data-url-personificar="{% url 'suap_auth_impersonation:impersonate_param' %}">
         <div class="diagnostico-conteudo">
             <div class="diagnostico-cabecalho">

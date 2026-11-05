@@ -1,4 +1,4 @@
-"""Diagnóstico de usuário para superusuários (personificação e autoinscrição).
+"""Diagnóstico de usuário para superusuários (personificação, exportação e autoinscrição).
 
 Somente leitura: consulta o Painel e o endpoint ``get_diagnostico_usuario`` do tool_painelava de cada ambiente.
 """
@@ -14,10 +14,13 @@ from typing import Any, Callable, Dict, List, Optional
 
 import requests
 from django.contrib.auth import get_user_model
-from django.http import HttpRequest, JsonResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_GET
 from django_rule_engine.explain_tree import explain_tree
 from django_suap_auth.impersonation.helpers import is_impersonating
+from django_suap_auth.profile import transfer
 
 from painel.models import Ambiente
 from painel.v1.services import (
@@ -180,6 +183,7 @@ def _usuario_json(usuario, operador) -> dict:
         "matriculas": _matriculas_exibidas(get_user_context(usuario)),
         "pode_personificar": not motivo,
         "motivo_bloqueio": motivo,
+        "url_editar": reverse(f"admin:{usuario._meta.app_label}_{usuario._meta.model_name}_change", args=[usuario.pk]),
     }
 
 
@@ -209,6 +213,20 @@ def diagnostico_usuario(request: HttpRequest, username: str) -> JsonResponse:
             "ambientes": ambientes,
         }
     )
+
+
+@require_GET
+@somente_superusuario
+def diagnostico_exportar(request: HttpRequest, username: str) -> HttpResponse:
+    """Mesmo JSON da ação "Exportar (JSON) com perfil, vínculos e dados brutos" do admin de usuários."""
+    usuario = _buscar_usuario(username.strip())
+    if usuario is None:
+        return JsonResponse({"error": "O usuário não existe no Painel."}, status=404)
+    payload = transfer.exportar_usuarios([usuario])
+    nome = f"usuarios-suap-{usuario.username}-{timezone.now():%Y%m%d-%H%M%S}.json"
+    response = HttpResponse(transfer.para_json(payload), content_type="application/json; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="{nome}"'
+    return response
 
 
 # --- Autoinscrição ---------------------------------------------------------------------------------------------

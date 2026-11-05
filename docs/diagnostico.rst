@@ -12,10 +12,12 @@ Na gaveta do usuário (tema ``ifrn25``), bloco **Admins**, item **Diagnosticar**
 rotas só existem para superusuários e ficam indisponíveis durante uma personificação (as rotas
 respondem ``409``). Para quem não é superusuário, as rotas respondem ``403``.
 
-Rotas (somente ``GET``, JSON):
+Rotas (somente ``GET``):
 
-- ``/diagnostico/<username>/usuario/``
-- ``/diagnostico/<username>/autoinscricao/``
+- ``/diagnostico/<username>/usuario/`` (JSON)
+- ``/diagnostico/<username>/autoinscricao/`` (JSON)
+- ``/diagnostico/<username>/exportar/`` (download do JSON de exportação; ``404`` se o usuário não existe
+  no Painel)
 
 Aba Personificar
 ================
@@ -27,6 +29,12 @@ existe, se está suspensa, o último acesso e a quantidade de cursos com inscri�
 O botão **Personificar** usa ``django_suap_auth`` e vale **só no Painel**: não personifica no Moodle
 nem no SUAP. Fica desabilitado quando o alvo é superusuário, é você mesmo, está inativo ou não existe
 no Painel (nunca fez login).
+
+Quando o usuário existe no Painel, ao lado de **Personificar** aparecem:
+
+- **Exportar**: baixa o mesmo JSON da ação *Exportar (JSON) com perfil, vínculos e dados brutos* do
+  admin de usuários (``django_suap_auth``), só com este usuário;
+- **Editar**: abre a tela de edição do usuário no admin, numa nova aba (issue #130).
 
 Aba Auto inscrição
 ==================
@@ -81,6 +89,10 @@ Nenhum evento leva username, nome, curso ou regra; só categorias e contagens.
      - ``cursos_total``, ``cursos_atende``, ``cursos_nao_atende``, ``motivo_principal``
    * - ``diagnostico_personificar``
      - ``permitido=sim``
+   * - ``diagnostico_exportar``
+     - —
+   * - ``diagnostico_editar``
+     - —
    * - ``diagnostico_personificar_bloqueado``
      - ``motivo`` (``alvo_superuser``, ``proprio_usuario``, ``inativo``, ``inexistente``)
    * - ``diagnostico_erro``

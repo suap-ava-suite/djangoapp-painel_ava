@@ -244,6 +244,7 @@
                 )
             );
 
+            const acoes = el('div', null, 'diagnostico-acoes');
             const botao = el('button', 'Personificar', 'diagnostico-btn');
             botao.type = 'button';
             if (dados.pode_personificar) {
@@ -259,7 +260,23 @@
                 painelPersonificar.appendChild(el('p', MOTIVOS_BLOQUEIO[dados.motivo_bloqueio] || 'Personificação indisponível.', 'diagnostico-alerta'));
                 track('diagnostico_personificar_bloqueado', { motivo: dados.motivo_bloqueio || 'desconhecido' });
             }
-            painelPersonificar.appendChild(botao);
+            acoes.appendChild(botao);
+            if (u) {
+                // Mesmo JSON da ação "Exportar" do admin de usuários (download direto)
+                const exportar = el('a', 'Exportar', 'diagnostico-btn');
+                exportar.href = urlPara(overlay.dataset.urlExportar, u.username);
+                exportar.setAttribute('download', '');
+                exportar.addEventListener('click', () => track('diagnostico_exportar'));
+                acoes.appendChild(exportar);
+                // Edição do usuário no admin, em nova aba para não perder o diagnóstico
+                const editar = el('a', 'Editar', 'diagnostico-btn');
+                editar.href = u.url_editar;
+                editar.target = '_blank';
+                editar.rel = 'noopener';
+                editar.addEventListener('click', () => track('diagnostico_editar'));
+                acoes.appendChild(editar);
+            }
+            painelPersonificar.appendChild(acoes);
         };
 
         // Blocos encaixados da explicação (django-rule-engine: RuleBlocks, rule_blocks.js/css)

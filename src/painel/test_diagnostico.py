@@ -99,14 +99,14 @@ def _diag(exists=True, autoinscricoes=None):
 # --- Acesso -----------------------------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("rota", ["usuario", "autoinscricao"])
+@pytest.mark.parametrize("rota", ["usuario", "autoinscricao", "exportar"])
 def test_anonimo_e_usuario_comum_recebem_403(usuarios, rota):
     _, _, aluno = usuarios
     assert Client().get(f"/diagnostico/x/{rota}/").status_code == 403
     assert _cliente(aluno).get(f"/diagnostico/x/{rota}/").status_code == 403
 
 
-@pytest.mark.parametrize("rota", ["usuario", "autoinscricao"])
+@pytest.mark.parametrize("rota", ["usuario", "autoinscricao", "exportar"])
 def test_recusa_durante_personificacao(usuarios, rota):
     admin, _, _ = usuarios
     client = _cliente(admin)
@@ -206,6 +206,39 @@ def test_personificacao_bloqueada_para_inativo(usuarios, ambientes):
     cache.clear()
     dados = _cliente(admin).get("/diagnostico/20261234/usuario/").json()
     assert dados["motivo_bloqueio"] == "inativo"
+
+
+def test_usuario_traz_link_de_edicao_no_admin(usuarios, ambientes):
+    admin, _, aluno = usuarios
+    Ambiente.objects.update(active=False)
+    cache.clear()
+    dados = _cliente(admin).get("/diagnostico/20261234/usuario/").json()
+    assert (
+        dados["usuario"]["url_editar"] == f"/admin/{aluno._meta.app_label}/{aluno._meta.model_name}/{aluno.pk}/change/"
+    )
+
+
+def test_exportar_baixa_o_mesmo_json_do_admin(usuarios):
+    admin, _, _ = usuarios
+    resposta = _cliente(admin).get("/diagnostico/20261234/exportar/")
+    assert resposta.status_code == 200
+    assert resposta["Content-Type"].startswith("application/json")
+    assert resposta["Content-Disposition"].startswith('attachment; filename="usuarios-suap-20261234-')
+    payload = json.loads(resposta.content)
+    assert payload["formato"]
+    assert [u["user"]["username"] for u in payload["usuarios"]] == ["20261234"]
+
+
+def test_exportar_usuario_inexistente(usuarios):
+    admin, _, _ = usuarios
+    resposta = _cliente(admin).get("/diagnostico/inexistente/exportar/")
+    assert resposta.status_code == 404
+    assert resposta.json() == {"error": "O usuário não existe no Painel."}
+
+
+def test_exportar_nao_aceita_post(usuarios):
+    admin, _, _ = usuarios
+    assert _cliente(admin).post("/diagnostico/20261234/exportar/").status_code == 405
 
 
 # --- Aba Auto inscrição -----------------------------------------------------------------------------------------
@@ -347,6 +380,7 @@ def test_menu_e_modal_so_para_superusuario(usuarios):
     html_admin = render_to_string(foot, {**ctx, "user": admin})
     assert 'id="diagnostico-modal"' in html_admin and "js/diagnostico.js" in html_admin
     assert "/diagnostico/__username__/usuario/" in html_admin
+    assert "/diagnostico/__username__/exportar/" in html_admin
     html_aluno = render_to_string(foot, {**ctx, "user": aluno})
     assert "diagnostico-modal" not in html_aluno and "diagnostico.js" not in html_aluno
     html_personificando = render_to_string(foot, {**ctx, "user": admin, "personificando": True})

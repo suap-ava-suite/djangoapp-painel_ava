@@ -114,6 +114,17 @@
         }
     }
 
+    a.diagnostico-btn {
+        display: inline-block;
+        text-decoration: none;
+    }
+
+    .diagnostico-acoes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
     .diagnostico-form .diagnostico-btn {
         margin-top: 0;
     }

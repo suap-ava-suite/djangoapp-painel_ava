@@ -25,6 +25,8 @@ Aba Personificar
 Mostra os dados do usuário no Painel (nome, e-mail mascarado, perfil, situação, último login) e os
 vínculos na mesma ordem de ``outras_matriculas``. Para cada ambiente Moodle ativo, informa se a conta
 existe, se está suspensa, o último acesso e a quantidade de cursos com inscrição ativa e suspensa.
+Quando a conta existe, **Ver conta** abre o perfil do usuário naquele Moodle (``/user/profile.php``),
+numa nova aba.
 
 O botão **Personificar** usa ``django_suap_auth`` e vale **só no Painel**: não personifica no Moodle
 nem no SUAP. Fica desabilitado quando o alvo é superusuário, é você mesmo, está inativo ou não existe
@@ -41,7 +43,8 @@ Aba Auto inscrição
 
 Lista todos os cursos com ``restricoes_de_autoinscricao`` de cada ambiente, inclusive ocultos, numa
 tabela-resumo. O botão **Ver regra** de cada curso abre o detalhe num modal que ocupa 90% da tela
-(Esc fecha só esse modal). Para cada curso, informa:
+(Esc fecha só esse modal). O nome do curso é um link para a página dele no Moodle
+(``/course/view.php``), numa nova aba. Para cada curso, informa:
 
 - **Atende?** e o motivo: ``ok``, ``regra_falsa``, ``regra_vazia``, ``regra_invalida``,
   ``erro_avaliacao`` ou ``usuario_inexistente_painel``, com a mensagem de erro quando houver;
@@ -92,6 +95,10 @@ Nenhum evento leva username, nome, curso ou regra; só categorias e contagens.
    * - ``diagnostico_exportar``
      - —
    * - ``diagnostico_editar``
+     - —
+   * - ``diagnostico_conta_abrir``
+     - —
+   * - ``diagnostico_curso_abrir``
      - —
    * - ``diagnostico_personificar_bloqueado``
      - ``motivo`` (``alvo_superuser``, ``proprio_usuario``, ``inativo``, ``inexistente``)

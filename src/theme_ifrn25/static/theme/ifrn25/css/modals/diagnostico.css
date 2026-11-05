@@ -119,6 +119,11 @@
         text-decoration: none;
     }
 
+    .diagnostico-link {
+        color: var(--primary);
+        text-decoration: underline;
+    }
+
     .diagnostico-acoes {
         display: flex;
         flex-wrap: wrap;

@@ -103,6 +103,18 @@
             }
             return bloco;
         };
+        // Link para o Moodle em nova aba; sem URL, só o texto
+        const linkMoodle = (texto, url, evento) => {
+            if (!url) {
+                return texto;
+            }
+            const a = el('a', texto, 'diagnostico-link');
+            a.href = url;
+            a.target = '_blank';
+            a.rel = 'noopener';
+            a.addEventListener('click', () => track(evento));
+            return a;
+        };
         const tabela = (cabecalhos, linhas) => {
             const t = el('table', null, 'diagnostico-tabela');
             const thead = t.createTHead().insertRow();
@@ -232,10 +244,11 @@
             painelPersonificar.appendChild(el('h3', 'Ambientes Moodle'));
             painelPersonificar.appendChild(
                 tabela(
-                    ['Ambiente', 'Situação', 'Conta suspensa', 'Último acesso', 'Inscrições ativas', 'Inscrições suspensas'],
+                    ['Ambiente', 'Situação', 'Conta', 'Conta suspensa', 'Último acesso', 'Inscrições ativas', 'Inscrições suspensas'],
                     dados.ambientes.map((a) => [
                         a.ambiente.nome,
                         a.mensagem ? `${STATUS_AMBIENTE[a.status] || a.status}: ${a.mensagem}` : STATUS_AMBIENTE[a.status] || a.status,
+                        a.conta ? linkMoodle('Ver conta', a.conta.url, 'diagnostico_conta_abrir') : '—',
                         a.conta ? (a.conta.suspended ? 'sim' : 'não') : '—',
                         a.conta ? formatarData(a.conta.lastaccess) : '—',
                         a.inscricoes ? a.inscricoes.active : '—',
@@ -333,7 +346,7 @@
             botao.type = 'button';
             botao.addEventListener('click', () => abrirRegra(curso, botao));
             return [
-                curso.fullname,
+                linkMoodle(curso.fullname, curso.url, 'diagnostico_curso_abrir'),
                 el('span', `${curso.atende ? '✔' : '✖'} ${MOTIVOS_AUTOINSCRICAO[curso.motivo] || curso.motivo}`, curso.atende ? 'diagnostico-sim' : 'diagnostico-nao'),
                 curso.visivel ? 'sim' : 'não',
                 curso.inscricao,

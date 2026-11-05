@@ -104,7 +104,15 @@ def _falha_de_rede(ava: Ambiente, servico: str, erro: Exception, mensagem: str) 
 
 
 def _ambiente_json(ava: Ambiente) -> dict:
-    return {"id": ava.id, "nome": ava.nome, "cor_mestra": ava.cor_mestra}
+    return {"id": ava.id, "nome": ava.nome, "cor_mestra": ava.cor_mestra, "url": ava.moodle_base_url}
+
+
+def _url_moodle(base: str, caminho: str, id_moodle: Any) -> Optional[str]:
+    """Link para uma página do Moodle; ``None`` se o id não for um inteiro (dado vindo do Moodle)."""
+    try:
+        return f"{base}/{caminho}?id={int(id_moodle)}"
+    except TypeError, ValueError:
+        return None
 
 
 def _em_paralelo(funcao: Callable[[Ambiente], dict]) -> List[dict]:
@@ -200,6 +208,8 @@ def diagnostico_usuario(request: HttpRequest, username: str) -> JsonResponse:
     for item in _em_paralelo(lambda ava: _diagnostico_moodle(ava, username)):
         dados = item.pop("dados") or {}
         item["conta"] = dados.get("user")
+        if isinstance(item["conta"], dict):
+            item["conta"]["url"] = _url_moodle(item["ambiente"]["url"], "user/profile.php", item["conta"].get("id"))
         item["inscricoes"] = dados.get("enrolments")
         ambientes.append(item)
 
@@ -279,7 +289,7 @@ def _rotulo_matricula(item) -> str:
     return " · ".join(str(parte) for parte in (item.get("campus"), curso) if parte)
 
 
-def _avaliar_curso(curso: dict, usuario, contexto: dict) -> dict:
+def _avaliar_curso(curso: dict, usuario, contexto: dict, base_moodle: str) -> dict:
     regra = (curso.get("restricoes_de_autoinscricao") or "").strip()
     atende, motivo, detalhe = avaliar_autoinscricao(regra, usuario, contexto if usuario else None)
     visivel = bool(curso.get("visible", True))
@@ -291,8 +301,10 @@ def _avaliar_curso(curso: dict, usuario, contexto: dict) -> dict:
         # Mensagem do erro da regra vem da explicação da django-rule-engine (já tratada por ela)
         detalhe = arvore.get("erro") or detalhe
         indices = _indices_que_atenderiam(regra, contexto)
+    courseid = curso.get("courseid") or curso.get("id")
     return {
-        "courseid": curso.get("courseid") or curso.get("id"),
+        "courseid": courseid,
+        "url": _url_moodle(base_moodle, "course/view.php", courseid),
         "fullname": curso.get("fullname", ""),
         "shortname": curso.get("shortname", ""),
         "visivel": visivel,
@@ -340,7 +352,8 @@ def diagnostico_autoinscricao(request: HttpRequest, username: str) -> JsonRespon
     # Avaliação na thread principal (ORM e cache de regras), só o HTTP vai para as threads
     ambientes = []
     for item in _em_paralelo(lambda ava: _cursos_autoinscricao(ava, username)):
-        item["cursos"] = [_avaliar_curso(c, usuario, contexto) for c in item["cursos"] if isinstance(c, dict)]
+        base = item["ambiente"]["url"]
+        item["cursos"] = [_avaliar_curso(c, usuario, contexto, base) for c in item["cursos"] if isinstance(c, dict)]
         ambientes.append(item)
 
     return JsonResponse(

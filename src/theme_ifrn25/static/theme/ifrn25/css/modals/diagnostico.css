@@ -16,6 +16,37 @@
         display: none;
     }
 
+    /* Regra de um curso: modal sobre o diagnóstico, ocupando 90% da tela */
+    .diagnostico-regra-overlay {
+        position: fixed;
+        inset: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10001;
+    }
+
+    .diagnostico-regra-overlay.hidden {
+        display: none;
+    }
+
+    .diagnostico-regra-conteudo {
+        background: var(--general-white);
+        color: #222;
+        border-radius: 1rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+        padding: 1.25rem;
+        width: 90vw;
+        height: 90vh;
+        overflow-y: auto;
+        font: var(--font-paragraph2);
+    }
+
+    .diagnostico-btn-regra {
+        white-space: nowrap;
+    }
+
     .diagnostico-conteudo {
         background: var(--general-white);
         color: #222;

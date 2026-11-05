@@ -72,6 +72,11 @@
         const resultado = d.getElementById('diagnostico-resultado');
         const painelPersonificar = d.getElementById('diagnostico-painel-personificar');
         const painelAutoinscricao = d.getElementById('diagnostico-painel-autoinscricao');
+        const regraModal = d.getElementById('diagnostico-regra-modal');
+        const regraTitulo = d.getElementById('diagnostico-regra-titulo');
+        const regraCorpo = d.getElementById('diagnostico-regra-corpo');
+        const regraFechar = d.getElementById('diagnostico-regra-fechar');
+        let botaoQueAbriuRegra = null;
         const abas = Array.from(overlay.querySelectorAll('[role="tab"]'));
         let usernameAtual = '';
         let autoinscricaoCarregada = false;
@@ -145,14 +150,29 @@
             track('diagnostico_abrir');
             campo.focus();
         };
+        const regraAberta = () => !regraModal.classList.contains('hidden');
+        const fecharRegra = () => {
+            regraModal.classList.add('hidden');
+            regraCorpo.replaceChildren();
+            botaoQueAbriuRegra?.focus();
+        };
         const fechar = (acao) => {
             controlador?.abort();
+            if (regraAberta()) {
+                fecharRegra();
+            }
             overlay.classList.add('hidden');
             d.removeEventListener('keydown', aoPressionarTecla);
             track('diagnostico_fechar', { acao });
         };
         const aoPressionarTecla = (evento) => {
-            if (evento.key === 'Escape') {
+            if (evento.key !== 'Escape') {
+                return;
+            }
+            // Esc fecha primeiro a regra aberta; só depois o diagnóstico
+            if (regraAberta()) {
+                fecharRegra();
+            } else {
                 fechar('esc');
             }
         };
@@ -253,8 +273,18 @@
             return caixa;
         };
 
-        const renderCurso = (curso) => {
-            const detalhes = el('div');
+        // Detalhe da regra do curso, aberto num modal de 90% da tela (a tabela fica só com o resumo)
+        const abrirRegra = (curso, botao) => {
+            const detalhes = regraCorpo;
+            detalhes.replaceChildren();
+            regraTitulo.textContent = curso.fullname || 'Regra de autoinscrição';
+            detalhes.appendChild(
+                el(
+                    'p',
+                    `${curso.atende ? '✔' : '✖'} ${MOTIVOS_AUTOINSCRICAO[curso.motivo] || curso.motivo}`,
+                    curso.atende ? 'diagnostico-sim' : 'diagnostico-nao'
+                )
+            );
             detalhes.appendChild(el('code', curso.regra || '(sem regra)', 'diagnostico-regra'));
             if (curso.detalhe) {
                 detalhes.appendChild(el('p', curso.detalhe, 'diagnostico-alerta'));
@@ -275,13 +305,23 @@
             if (campos.length) {
                 detalhes.appendChild(el('p', `Valores do usuário: ${campos.map(([k, v]) => `${k} = ${JSON.stringify(v)}`).join('; ')}`, 'diagnostico-valores'));
             }
+            botaoQueAbriuRegra = botao;
+            regraModal.classList.remove('hidden');
+            regraFechar.focus();
+            track('diagnostico_regra_abrir', { motivo: curso.motivo });
+        };
+
+        const renderCurso = (curso) => {
+            const botao = el('button', 'Ver regra', 'diagnostico-btn diagnostico-btn-regra');
+            botao.type = 'button';
+            botao.addEventListener('click', () => abrirRegra(curso, botao));
             return [
                 curso.fullname,
                 el('span', `${curso.atende ? '✔' : '✖'} ${MOTIVOS_AUTOINSCRICAO[curso.motivo] || curso.motivo}`, curso.atende ? 'diagnostico-sim' : 'diagnostico-nao'),
                 curso.visivel ? 'sim' : 'não',
                 curso.inscricao,
                 curso.aparece_no_painel ? 'sim' : 'não',
-                detalhes,
+                botao,
             ];
         };
 
@@ -303,7 +343,7 @@
                     return;
                 }
                 painelAutoinscricao.appendChild(
-                    tabela(['Curso', 'Atende?', 'Visível', 'Inscrição', 'Aparece no Painel', 'Por quê'], a.cursos.map((c) => renderCurso(c)))
+                    tabela(['Curso', 'Atende?', 'Visível', 'Inscrição', 'Aparece no Painel', 'Regra'], a.cursos.map((c) => renderCurso(c)))
                 );
             });
             const ctx = dados.contexto;
@@ -364,6 +404,12 @@
 
         form.addEventListener('submit', consultar);
         d.getElementById('diagnostico-fechar').addEventListener('click', () => fechar('botao'));
+        regraFechar.addEventListener('click', fecharRegra);
+        regraModal.addEventListener('click', (evento) => {
+            if (evento.target === regraModal) {
+                fecharRegra();
+            }
+        });
         overlay.addEventListener('click', (evento) => {
             if (evento.target === overlay) {
                 fechar('fora');

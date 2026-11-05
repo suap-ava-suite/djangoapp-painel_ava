@@ -99,6 +99,7 @@ EVENTOS_PLANEJADOS = [
     "diagnostico_personificar_bloqueado",
     "diagnostico_erro",
     "diagnostico_fechar",
+    "diagnostico_regra_abrir",
 ]
 
 

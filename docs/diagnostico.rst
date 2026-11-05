@@ -31,8 +31,9 @@ no Painel (nunca fez login).
 Aba Auto inscrição
 ==================
 
-Lista todos os cursos com ``restricoes_de_autoinscricao`` de cada ambiente, inclusive ocultos, e
-informa para cada um:
+Lista todos os cursos com ``restricoes_de_autoinscricao`` de cada ambiente, inclusive ocultos, numa
+tabela-resumo. O botão **Ver regra** de cada curso abre o detalhe num modal que ocupa 90% da tela
+(Esc fecha só esse modal). Para cada curso, informa:
 
 - **Atende?** e o motivo: ``ok``, ``regra_falsa``, ``regra_vazia``, ``regra_invalida``,
   ``erro_avaliacao`` ou ``usuario_inexistente_painel``, com a mensagem de erro quando houver;
@@ -86,3 +87,5 @@ Nenhum evento leva username, nome, curso ou regra; só categorias e contagens.
      - ``etapa`` (``usuario``, ``autoinscricao``), ``status`` (HTTP; ``0`` para falha de rede)
    * - ``diagnostico_fechar``
      - ``acao`` (``esc``, ``fora``, ``botao``)
+   * - ``diagnostico_regra_abrir``
+     - ``motivo`` (os mesmos valores de ``motivo_principal``)

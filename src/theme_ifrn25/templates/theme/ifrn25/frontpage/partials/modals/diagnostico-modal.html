@@ -29,5 +29,18 @@
                 <section id="diagnostico-painel-autoinscricao" role="tabpanel" aria-labelledby="diagnostico-aba-autoinscricao" class="diagnostico-painel hidden"></section>
             </div>
         </div>
+        <div id="diagnostico-regra-modal"
+             class="diagnostico-regra-overlay hidden"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="diagnostico-regra-titulo">
+            <div class="diagnostico-regra-conteudo">
+                <div class="diagnostico-cabecalho">
+                    <h2 id="diagnostico-regra-titulo">Regra de autoinscrição</h2>
+                    <button type="button" id="diagnostico-regra-fechar" class="diagnostico-fechar" aria-label="Fechar regra">&times;</button>
+                </div>
+                <div id="diagnostico-regra-corpo"></div>
+            </div>
+        </div>
     </div>
 {% endif %}

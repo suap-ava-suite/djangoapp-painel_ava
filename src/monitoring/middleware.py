@@ -28,6 +28,7 @@ class HTTPMetricsMiddleware:
                 try:
                     match = resolve(request.path_info)
                 except Resolver404:
+                    # Caminhos sem rota ficam em "unmatched", sem expor a URL nos rótulos.
                     pass
             route = getattr(match, "route", None) or "unmatched"
             # A rota da raiz é a string vazia; preserva sua identidade.

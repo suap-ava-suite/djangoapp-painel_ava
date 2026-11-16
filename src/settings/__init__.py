@@ -7,7 +7,7 @@ from settings.integrations import *  # noqa
 from settings.internationalizations import *  # noqa
 from settings.loggings import *  # noqa
 from settings.middlewares import *  # noqa
-from settings.monitoring import *  # noqa
+from settings.monitoring import PAINEL_METRICS_TOKEN  # noqa: F401
 from settings.observabilities import *  # noqa
 from settings.project import *  # noqa
 from settings.routings import *  # noqa

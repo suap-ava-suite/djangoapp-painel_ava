@@ -1,0 +1,15 @@
+# Exemplo para o Prometheus de manchester: acrescente este job à configuração existente.
+# Preserve os outros jobs, incluindo o node_exporter na porta 9100.
+# Monte o arquivo de credenciais no contêiner do Prometheus antes de ativar a coleta.
+scrape_configs:
+  - job_name: painel-ava
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    metrics_path: /metrics
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/painel/token
+    static_configs:
+      - targets: ["10.22.1.27:80", "10.22.0.112:80"] # cambia e pune
+        labels:
+          application: painel-ava

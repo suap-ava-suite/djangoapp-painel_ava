@@ -76,6 +76,12 @@ Abra seu navegador no endereço: `http://localhost:8000 <http://localhost:8000>`
 5. Automação CI/CD no GitHub Actions
 ====================================
 
+Antes de publicar uma release com as mudanças de monitoramento HTTP, conclua e registre
+as :ref:`verificações obrigatórias de infraestrutura e coleta <monitoramento-pre-release>`.
+Essa etapa antecede a publicação, pois o workflow de build/deploy é acionado pela release
+já publicada. Ela inclui confirmar o Prometheus, os segredos, a configuração e a
+conectividade de coleta de cada réplica no ambiente de destino.
+
 O repositório possui workflows automatizados em ``.github/workflows/``:
 
 - **Documentação (``docs.yml``)**:

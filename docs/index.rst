@@ -19,6 +19,7 @@ Guia de Navegação
 
    instalacao-e-testes
    diagnostico
+   monitoramento
    nova-api
    plano-apiv2
    evolucao-do-design

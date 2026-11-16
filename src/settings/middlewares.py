@@ -3,6 +3,7 @@ from settings.indebug import DEBUG
 
 # Middleware
 MIDDLEWARE = [
+    "monitoring.middleware.HTTPMetricsMiddleware",
     "painel.middleware.ExceptionMiddleware",
     "painel.middleware.GoToHTTPSMiddleware",  # <-
     "painel.middleware.XForwardedForMiddleware",

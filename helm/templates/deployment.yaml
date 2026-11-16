@@ -81,6 +81,14 @@ spec:
             - name: POSTGRES_PORT
               value: {{ .Values.env.POSTGRES_PORT | default "5432" | quote }}
 
+            {{- if .Values.metrics.tokenSecret.name }}
+            - name: PAINEL_METRICS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.metrics.tokenSecret.name }}
+                  key: {{ .Values.metrics.tokenSecret.key }}
+            {{- end }}
+
           {{- with .Values.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}

@@ -22,6 +22,7 @@ from django_rule_engine.explain_tree import explain_tree
 from django_suap_auth.impersonation.helpers import is_impersonating
 from django_suap_auth.profile import transfer
 
+from monitoring.http import moodle_operation
 from painel.models import Ambiente
 from painel.v1.services import (
     MOTIVO_OK,
@@ -75,26 +76,27 @@ def somente_superusuario(view: Callable) -> Callable:
 
 def _chamar_moodle(ava: Ambiente, servico: str, **params: Any) -> Any:
     """GET no tool_painelava sem enviar ao Sentry (uso pontual e manual por superusuário)."""
-    querystring = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
-    url = f"{ava.moodle_base_api_url}/?{servico}&{querystring}"
-    try:
-        return get_json(url, headers={"Authentication": f"Token {ava.token}"})
-    except HTTPException as e:
-        status = getattr(e, "status", None)
+    with moodle_operation(ava, servico):
+        querystring = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
+        url = f"{ava.moodle_base_api_url}/?{servico}&{querystring}"
         try:
-            mensagem = json.loads(getattr(e, "body", "") or "")["error"]["message"]
-        except ValueError, KeyError, TypeError:
-            mensagem = ""
-        if status == 404 and mensagem == MOODLE_SERVICO_INEXISTENTE:
-            raise MoodleIndisponivel(STATUS_ENDPOINT_INDISPONIVEL, "Atualize o tool_painelava deste Moodle.")
-        logger.warning(f"Diagnóstico: Moodle '{ava.nome}' {servico} respondeu HTTP {status}: {mensagem}")
-        raise MoodleIndisponivel(STATUS_ERRO, f"O Moodle respondeu com erro HTTP {status}.", f"HTTP {status}")
-    except requests.exceptions.Timeout as e:
-        raise _falha_de_rede(ava, servico, e, "O Moodle não respondeu a tempo.")
-    except requests.exceptions.ConnectionError as e:
-        raise _falha_de_rede(ava, servico, e, "Não foi possível conectar ao Moodle.")
-    except (requests.exceptions.RequestException, ValueError) as e:
-        raise _falha_de_rede(ava, servico, e, "Resposta inválida do Moodle.")
+            return get_json(url, headers={"Authentication": f"Token {ava.token}"})
+        except HTTPException as e:
+            status = getattr(e, "status", None)
+            try:
+                mensagem = json.loads(getattr(e, "body", "") or "")["error"]["message"]
+            except ValueError, KeyError, TypeError:
+                mensagem = ""
+            if status == 404 and mensagem == MOODLE_SERVICO_INEXISTENTE:
+                raise MoodleIndisponivel(STATUS_ENDPOINT_INDISPONIVEL, "Atualize o tool_painelava deste Moodle.")
+            logger.warning(f"Diagnóstico: Moodle '{ava.nome}' {servico} respondeu HTTP {status}: {mensagem}")
+            raise MoodleIndisponivel(STATUS_ERRO, f"O Moodle respondeu com erro HTTP {status}.", f"HTTP {status}")
+        except requests.exceptions.Timeout as e:
+            raise _falha_de_rede(ava, servico, e, "O Moodle não respondeu a tempo.")
+        except requests.exceptions.ConnectionError as e:
+            raise _falha_de_rede(ava, servico, e, "Não foi possível conectar ao Moodle.")
+        except (requests.exceptions.RequestException, ValueError) as e:
+            raise _falha_de_rede(ava, servico, e, "Resposta inválida do Moodle.")
 
 
 def _falha_de_rede(ava: Ambiente, servico: str, erro: Exception, mensagem: str) -> MoodleIndisponivel:

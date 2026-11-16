@@ -19,6 +19,7 @@ from django.shortcuts import get_object_or_404
 from django.urls import reverse
 
 from backup.models import ArquivoBackup
+from monitoring.http import MoodleBatch, destination_for, moodle_operation, observe_invalid_json
 from painel.models import Ambiente, Curso
 
 logger = logging.getLogger(__name__)
@@ -257,7 +258,13 @@ def requests_get(url, headers={}, encoding="utf-8", decode=True, **kwargs):
 
 def get_json(url, headers={}, encoding="utf-8", json_kwargs=None, **kwargs):
     content = requests_get(url, headers=headers, encoding=encoding, **kwargs)
-    return json.loads(content, **(json_kwargs or {}))
+    try:
+        return json.loads(content, **(json_kwargs or {}))
+    except ValueError:
+        destination = destination_for(url)
+        if destination is not None:
+            observe_invalid_json(destination)
+        raise
 
 
 def _resumir_quantidades(data: Any) -> str:
@@ -278,25 +285,31 @@ def _log_chamada_moodle(ava: Ambiente, service: str, inicio: float, resultado: s
 
 
 def get_json_api(ava: Ambiente, service: str, **params: dict):
-    # Codifica os valores: nomes e e-mails com espaço, "&" ou "#" não podem quebrar a URL
-    querystring = urllib.parse.urlencode({k: v for k, v in (params or {}).items() if v is not None})
-    url = f"{ava.moodle_base_api_url}/?{service}&{querystring}"
-    inicio = time.monotonic()
-    try:
-        data = get_json(url, headers={"Authentication": f"Token {ava.token}"})
-        _log_chamada_moodle(ava, service, inicio, "ok", _resumir_quantidades(data))
-        return data
-    except HTTPException as e:
-        if _usuario_nao_encontrado(e):
-            _log_chamada_moodle(ava, service, inicio, "usuário não encontrado")
+    with moodle_operation(ava, service) as observation:
+        # Codifica os valores: nomes e e-mails com espaço, "&" ou "#" não podem quebrar a URL
+        querystring = urllib.parse.urlencode({k: v for k, v in (params or {}).items() if v is not None})
+        url = f"{ava.moodle_base_api_url}/?{service}&{querystring}"
+        inicio = time.monotonic()
+        try:
+            data = get_json(url, headers={"Authentication": f"Token {ava.token}"})
+            _log_chamada_moodle(ava, service, inicio, "ok", _resumir_quantidades(data))
+            if not isinstance(data, (dict, list)):
+                raise ValueError("Resposta Moodle fora do formato esperado")
+            return data
+        except HTTPException as e:
+            if _usuario_nao_encontrado(e):
+                observation.outcome = "expected_absence"
+                _log_chamada_moodle(ava, service, inicio, "usuário não encontrado")
+                return None
+            observation.outcome = "failure"
+            _log_chamada_moodle(ava, service, inicio, f"falha HTTP {getattr(e, 'status', '?')}")
+            _registrar_falha_moodle(ava, service, url, e)
             return None
-        _log_chamada_moodle(ava, service, inicio, f"falha HTTP {getattr(e, 'status', '?')}")
-        _registrar_falha_moodle(ava, service, url, e)
-        return None
-    except (requests.exceptions.RequestException, ValueError) as e:
-        _log_chamada_moodle(ava, service, inicio, f"falha {type(e).__name__}")
-        _registrar_falha_moodle(ava, service, url, e)
-        return None
+        except (requests.exceptions.RequestException, ValueError) as e:
+            observation.outcome = "invalid_response" if isinstance(e, ValueError) else "failure"
+            _log_chamada_moodle(ava, service, inicio, f"falha {type(e).__name__}")
+            _registrar_falha_moodle(ava, service, url, e)
+            return None
 
 
 def _usuario_nao_encontrado(exc: HTTPException) -> bool:
@@ -431,8 +444,10 @@ def get_diarios(
                 if k not in ["ambiente", "results", "usuario_db"] and str(v).strip() != ""
             }
 
-            return get_json_api(params["ambiente"], "get_diarios", **querystrings) or {}
+            with batch.track(params["ambiente"]):
+                return get_json_api(params["ambiente"], "get_diarios", **querystrings) or {}
         except Exception as e:
+            batch.fail(params["ambiente"])
             logging.error(e)
             sentry_sdk.capture_exception(e)
             return {}
@@ -479,6 +494,7 @@ def get_diarios(
                     params["results"][k] += [_merge_course(diario, ambientedict) for diario in v or []]
 
         except Exception as e:
+            batch.fail(params["ambiente"])
             logging.error(e)
             sentry_sdk.capture_exception(e)
 
@@ -489,6 +505,7 @@ def get_diarios(
 
     has_ambiente = ambiente != "" and ambiente is not None and f"{ambiente}".isnumeric()
     ambientes = [ava for ava in Ambiente.cached() if (has_ambiente and int(ambiente) == ava.id) or not has_ambiente]
+    batch = MoodleBatch(ambientes)
     logger.debug(f"Ambientes selecionados para consulta: {[a.moodle_base_api_url for a in ambientes]}")
 
     results = {
@@ -600,6 +617,7 @@ def get_diarios(
         )
     ]
 
+    batch.observe("get_diarios")
     return results
 
 
@@ -632,6 +650,7 @@ def get_progresso(username: str, ambiente: str = None, cursos: str = None) -> di
     has_ambiente = ambiente != "" and ambiente is not None and f"{ambiente}".isnumeric()
     ambientes = [ava for ava in Ambiente.cached() if (has_ambiente and int(ambiente) == ava.id) or not has_ambiente]
 
+    batch = MoodleBatch(ambientes)
     results = []
 
     def _get_progresso_moodle(params: dict):
@@ -641,7 +660,8 @@ def get_progresso(username: str, ambiente: str = None, cursos: str = None) -> di
             querystrings["cursos"] = params["cursos"]
 
         try:
-            data = get_json_api(ava, "get_progresso", **querystrings) or []
+            with batch.track(ava):
+                data = get_json_api(ava, "get_progresso", **querystrings) or []
             if data:
                 for item in data:
                     item["ambiente_id"] = ava.id
@@ -649,6 +669,7 @@ def get_progresso(username: str, ambiente: str = None, cursos: str = None) -> di
                 with lock:
                     params["results"].extend(data)
         except Exception as e:
+            batch.fail(ava)
             logger.error(f"Erro em get_progresso ({ava.nome}): {e}")
         finally:
             # Rede de segurança: nunca deixar conexão aberta numa thread auxiliar
@@ -667,4 +688,5 @@ def get_progresso(username: str, ambiente: str = None, cursos: str = None) -> di
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         executor.map(_get_progresso_moodle, requests_args)
 
+    batch.observe("get_progresso")
     return {"progresso": results}

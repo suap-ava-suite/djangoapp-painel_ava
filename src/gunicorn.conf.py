@@ -19,3 +19,10 @@ access_logfile = env_as_bool("DJANGO_DEBUG", False) and "-" or None
 capture_output = False
 syslog = False
 logger_class = "gunicorn.glogging.Logger"
+
+
+def child_exit(server, worker):
+    from prometheus_client import multiprocess
+
+    if os.environ.get("PROMETHEUS_MULTIPROC_DIR"):
+        multiprocess.mark_process_dead(worker.pid)

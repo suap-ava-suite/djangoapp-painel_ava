@@ -1,10 +1,12 @@
 import logging
-from urllib.request import urlopen
 
+import requests
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
 from django.http import HttpRequest, HttpResponse, JsonResponse
+
+from monitoring.http import Destination, destination_context
 
 
 def liveness(request: HttpRequest) -> HttpResponse:
@@ -29,21 +31,26 @@ def readiness(request: HttpRequest) -> JsonResponse:
         cache_result = cache.get("check_health") == "OK"
 
     try:
-        resp = urlopen("https://suap.ifrn.edu.br/comum/solicitar_trocar_senha/", timeout=settings.DEFAULT_HTTP_TIMEOUT)
+        base = settings.SUAP_AUTH["BASE_URL"].rstrip("/")
+        destination = Destination("suap", "suap", "readiness", "probe", base)
+        with destination_context(destination):
+            resp = requests.get(base + "/comum/solicitar_trocar_senha/", timeout=settings.DEFAULT_HTTP_TIMEOUT)
     except Exception as e:
         logging.error(e)
         suap_result = False
     else:
-        suap_result = resp.getcode() == 200
+        suap_result = resp.status_code == 200
 
+    all_ready = db_result and cache_result and suap_result
     return JsonResponse(
         {
             "Database": db_result,
             "Cache": cache_result,
             "SUAP": suap_result,
             "Debug": settings.DEBUG,
-            "ALL": db_result and cache_result and suap_result and settings.DEBUG,
-        }
+            "ALL": all_ready,
+        },
+        status=200 if all_ready else 503,
     )
 
 

@@ -8,8 +8,8 @@ forma cada usuário tem acesso aos cursos/diários em que está inscrito sem pre
 O **Painel AVA** é parte da **[SUAP/AVA Suite](https://suap-ava-suite.github.io/index.html)**, veja lá como o que é
 como desenvolver, implantar ou usar a Suite.
 
-> ***Este projeto não integra o SUAP ao Moodle. Se tua necessidade é essa, procure
-> o `integrador-ava`.***
+> _**Este projeto não integra o SUAP ao Moodle. Se tua necessidade é essa, procure
+> o `integrador-ava`.**_
 
 Encontrou um problema no **Painel AVA**, aba uma
 [issue](https://github.com/suap-ava-suite/djangoapp-painel_ava/issues),
@@ -18,7 +18,6 @@ ou melhor, faça um fork e abra uma pull request.
 Encontrou um problema no **SUAP/AVA Suite**]**, aba uma
 [issue](https://github.com/suap-ava-suite/suap-ava-suite.github.io/issues),
 ou melhor, faça um fork e abra uma pull request.
-
 
 ## Fale conosco
 
@@ -38,3 +37,9 @@ Educacionais (DEAD)](mailto:dead.zl@ifrn.du.br) do IFRN.
 ![screenshot](docs/images/screenshot.v5.mobile.png)
 
 Confira a [evolução do design](docs/evolucao-do-design.md).
+
+## Monitoramento HTTP
+
+O Django expõe métricas de entrada e das chamadas ao Moodle/SUAP em `/metrics`, protegido
+por `PAINEL_METRICS_TOKEN`. A configuração de coleta com Prometheus e ServiceMonitor está descrita em
+[monitoramento](docs/monitoramento.rst).

@@ -107,9 +107,9 @@ class ExceptionMiddleware:
             return self.get_response(request)
         except Exception as e:
             if isinstance(e, psycopg_pool.PoolTimeout):
-                return HttpResponse("Erro de conexão com o banco!")
+                return HttpResponse("Erro de conexão com o banco!", status=500)
             if isinstance(e, psycopg.errors.Error):
-                return HttpResponse("Erro de conexão com o banco!")
+                return HttpResponse("Erro de conexão com o banco!", status=500)
             if isinstance(e, DisallowedHost):
                 from django.template import loader
 

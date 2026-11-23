@@ -6,7 +6,7 @@ ARG BASEIMAGE=6.0.8.50
 FROM ctezlifrn/avaintegrationbase:$BASEIMAGE AS base
 
 RUN uv pip install --system \
-        django-compressor django-sass-processor
+        django-compressor django-sass-processor 'prometheus-client>=0.22,<1'
 
 
 #########################
@@ -35,7 +35,7 @@ EXPOSE 8000
 WORKDIR /app/src
 ENTRYPOINT []
 
-CMD ["sh", "-c", "python manage.py migrate --noinput && exec gunicorn"]
+CMD ["sh", "./gunicorn-entrypoint.sh"]
 
 
 #########################

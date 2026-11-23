@@ -34,7 +34,7 @@ def test_exception_middleware_handles_db_timeout(rf: RequestFactory):
 
     middleware = ExceptionMiddleware(get_response)
     response = middleware(request)
-    assert response.status_code == 200
+    assert response.status_code == 500
     assert response.content == "Erro de conexão com o banco!".encode("utf-8")
 
 
@@ -46,7 +46,7 @@ def test_exception_middleware_handles_db_error(rf: RequestFactory):
 
     middleware = ExceptionMiddleware(get_response)
     response = middleware(request)
-    assert response.status_code == 200
+    assert response.status_code == 500
     assert response.content == "Erro de conexão com o banco!".encode("utf-8")
 
 

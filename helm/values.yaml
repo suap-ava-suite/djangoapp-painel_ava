@@ -68,3 +68,9 @@ affinity:
               operator: NotIn
               values:
                 - infra-k8s
+
+# /metrics exige um Bearer token. O Secret deve existir no namespace do painel.
+metrics:
+  tokenSecret:
+    name: ""
+    key: token

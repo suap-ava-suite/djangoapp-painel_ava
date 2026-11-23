@@ -16,6 +16,7 @@ classifiers = [
 ]
 dependencies = [
     "avaintegration-metapackage==6.0.8.50",
+    "prometheus-client>=0.22,<1",
 ]
 
 [project.optional-dependencies]
@@ -29,6 +30,7 @@ dev = [
     "python-dotenv>=1.2.2",
     "pytest-coverage-gate>=1.0.3",
     "pytest-django>=4.12.0",
+    "responses>=0.26,<1",
     "django-sass-processor==1.4.2",
     "django-debug-toolbar",
     "sphinx>=7.0.0",

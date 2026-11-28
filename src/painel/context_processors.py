@@ -32,6 +32,7 @@ def layout_settings(request: HttpRequest) -> dict:
         "personificando": is_impersonating(request),
         "last_startup": settings.LAST_STARTUP,
         "app_version": settings.APP_VERSION,
+        "app_environment": settings.APP_ENVIRONMENT,
         "hostname": settings.HOSTNAME,
         "gtag": settings.GTAG_CODE if hasattr(settings, "GTAG_CODE") else False,
         "clarity": settings.CLARITY_CODE if hasattr(settings, "CLARITY_CODE") else False,

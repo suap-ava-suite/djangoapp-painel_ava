@@ -41,6 +41,9 @@ jobs:
           file: ./Dockerfile
           target: production
           push: true
+          # Ambiente gravado na imagem: test nas tags -test, production nas demais
+          build-args: |
+            APP_ENVIRONMENT=${{ endsWith(github.ref_name, '-test') && 'test' || 'production' }}
           platforms: linux/amd64,linux/arm64
           tags: ${{ env.MAIN_IMAGE }}:${{ github.ref_name }}
 

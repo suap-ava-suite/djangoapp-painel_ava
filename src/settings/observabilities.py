@@ -24,7 +24,7 @@ if env("SENTRY_DNS") is not None:
     from sentry_sdk.integrations.logging import LoggingIntegration, ignore_logger
     from sentry_sdk.integrations.redis import RedisIntegration
 
-    from settings.project import APP_VERSION
+    from settings.project import APP_ENVIRONMENT, APP_RELEASE
 
     SENTRY_SETTINGS = dict(
         dsn=env("SENTRY_DNS"),
@@ -45,10 +45,10 @@ if env("SENTRY_DNS") is not None:
         # you may enable sending PII data.
         send_default_pii=env_as_bool("SENTRY_SEND_DEFAULT_PII", True),
         debug=env_as_bool("SENTRY_DEBUG", False),
-        environment=env("SENTRY_ENVIRONMENT", "local"),
+        environment=env("SENTRY_ENVIRONMENT", APP_ENVIRONMENT),
         max_breadcrumbs=env_as_int("SENTRY_MAX_BREADCRUMBS", 100),
         ignore_errors=[DisallowedHost],
-        release=env("SENTRY_RELEASE", APP_VERSION),
+        release=env("SENTRY_RELEASE", APP_RELEASE),
         profiles_sample_rate=env_as_int("SENTRY_PROFILES_SAMPLE_RATE", 100) / 100.0,
         # attach_stacktrace=env('SENTRY_ATTACH_STACKTRACE', 'off'),
         # server_name=env('SENTRY_SERVER_NAME', 'off'),
@@ -67,12 +67,13 @@ if env("SENTRY_DNS") is not None:
 # Sentry do JavaScript (navegador): DSN próprio, independente do SENTRY_DNS do Django.
 # Sem SENTRY_JS_DSN, o front-end não carrega o SDK nem envia nada.
 if env("SENTRY_JS_DSN") is not None:
-    from settings.project import APP_VERSION as _SENTRY_JS_APP_VERSION
+    from settings.project import APP_ENVIRONMENT as _SENTRY_JS_ENVIRONMENT
+    from settings.project import APP_RELEASE as _SENTRY_JS_RELEASE
 
     SENTRY_JS = dict(  # noqa
         dsn=env("SENTRY_JS_DSN"),
-        environment=env("SENTRY_JS_ENVIRONMENT", env("SENTRY_ENVIRONMENT", "local")),
-        release=env("SENTRY_RELEASE", _SENTRY_JS_APP_VERSION),
+        environment=env("SENTRY_JS_ENVIRONMENT", env("SENTRY_ENVIRONMENT", _SENTRY_JS_ENVIRONMENT)),
+        release=env("SENTRY_RELEASE", _SENTRY_JS_RELEASE),
         # Informe em porcentual, ou seja, 50 significa que 50% dos erros serão reportados.
         sampleRate=env_as_int("SENTRY_JS_SAMPLE_RATE", 100) / 100.0,
     )

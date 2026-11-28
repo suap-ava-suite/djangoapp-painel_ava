@@ -45,7 +45,7 @@ data:
   # ======================
   # Sentry
   # ======================
-  SENTRY_ENVIRONMENT: "production"
+  # SENTRY_ENVIRONMENT: o padrão é o APP_ENVIRONMENT da imagem (test, nas tags -test)
   SENTRY_SAMPLE_RATE: "1"
   SENTRY_TRACES_SAMPLE_RATE: "1"
 

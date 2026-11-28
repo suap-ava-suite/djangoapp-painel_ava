@@ -14,6 +14,8 @@ RUN uv pip install --system \
 ########################################################################
 FROM base AS build
 
+# Fonte única da versão: settings/project.py lê /app/pyproject.toml
+COPY --chown=root:app pyproject.toml /app/pyproject.toml
 COPY --chown=root:app src /app/src
 WORKDIR /app/src
 
@@ -27,6 +29,10 @@ RUN python manage.py collectstatic --noinput -v 0 \
 # 3. Production stage
 ########################################################################
 FROM base AS production
+
+# local, test ou production (o workflow informa conforme a tag); sem o build-arg, local
+ARG APP_ENVIRONMENT=local
+ENV APP_ENVIRONMENT=$APP_ENVIRONMENT
 
 COPY --chown=root:app --from=build /app /app
 
@@ -46,6 +52,11 @@ FROM base AS development
 RUN uv pip install --system \
         black ruff doc8 pytest pytest-cov python-dotenv pytest-coverage-gate pytest-django \
         Werkzeug django-debug-toolbar debugpy ipython
+
+ARG APP_ENVIRONMENT=local
+ENV APP_ENVIRONMENT=$APP_ENVIRONMENT
+# No docker-compose de desenvolvimento o pyproject.toml também é montado em /app (mantém a versão atual)
+COPY --chown=root:app pyproject.toml /app/pyproject.toml
 
 WORKDIR /app/src
 USER app
